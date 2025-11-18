@@ -47,18 +47,13 @@ import Foreign.Storable
 import System.Socket.Internal.Socket
 import System.Socket.Internal.SocketOption
 import System.Socket.Internal.Platform
-
-#include "hs_socket.h"
-
-#if __GLASGOW_HASKELL__ < 800
-#let alignment t = "%lu", (unsigned long)offsetof(struct {char x__; t (y__); }, y__)
-#endif
+import System.Socket.Internal.Constants
 
 -- | The [Internet Protocol version 6](https://en.wikipedia.org/wiki/IPv6).
 data Inet6
 
 instance Family Inet6 where
-  familyNumber _ = (#const AF_INET6)
+  familyNumber _ = c_AF_INET6
   -- | An [IPv6](https://en.wikipedia.org/wiki/IPv6) socket address.
   --
   --   The socket address contains a port number that may be used by transport
@@ -257,8 +252,8 @@ instance Storable Inet6Address where
     pokeByteOff ptr 15 (w64_7 low)
 
 instance Storable Inet6Port where
-  sizeOf   _  = (#size uint16_t)
-  alignment _ = (#alignment uint16_t)
+  sizeOf   _  = sizeOf (undefined :: Word16)
+  alignment _ = alignment (undefined :: Word16)
   peek ptr    = do
     p0 <- peekByteOff ptr 0 :: IO Word8
     p1 <- peekByteOff ptr 1 :: IO Word8
@@ -268,8 +263,8 @@ instance Storable Inet6Port where
     pokeByteOff ptr 1 (w16_1 w16)
 
 instance Storable Inet6FlowInfo where
-  sizeOf   _  = (#size uint32_t)
-  alignment _ = (#alignment uint32_t)
+  sizeOf   _  = sizeOf (undefined :: Word32)
+  alignment _ = alignment (undefined :: Word32)
   peek ptr    = do
     p0 <- peekByteOff ptr 0 :: IO Word8
     p1 <- peekByteOff ptr 1 :: IO Word8
@@ -284,8 +279,8 @@ instance Storable Inet6FlowInfo where
     pokeByteOff ptr 3 (w32_3 w32)
 
 instance Storable Inet6ScopeId where
-  sizeOf   _  = (#size uint32_t)
-  alignment _ = (#alignment uint32_t)
+  sizeOf   _  = sizeOf (undefined :: Word32)
+  alignment _ = alignment (undefined :: Word32)
   peek ptr    = do
     p0 <- peekByteOff ptr 0 :: IO Word8
     p1 <- peekByteOff ptr 1 :: IO Word8
@@ -300,30 +295,20 @@ instance Storable Inet6ScopeId where
     pokeByteOff ptr 3 (w32_3 w32)
 
 instance Storable (SocketAddress Inet6) where
-  sizeOf    _ = (#size struct sockaddr_in6)
-  alignment _ = (#alignment struct sockaddr_in6)
-  peek ptr    = SocketAddressInet6  A.<$> peek (sin6_addr     ptr)
-                                      <*> peek (sin6_port     ptr)
-                                      <*> peek (sin6_flowinfo ptr)
-                                      <*> peek (sin6_scope_id ptr)
-    where
-      sin6_flowinfo = (#ptr struct sockaddr_in6, sin6_flowinfo)
-      sin6_scope_id = (#ptr struct sockaddr_in6, sin6_scope_id)
-      sin6_port     = (#ptr struct sockaddr_in6, sin6_port)
-      sin6_addr     = (#ptr struct in6_addr, s6_addr) . (#ptr struct sockaddr_in6, sin6_addr)
+  sizeOf    _ = sockaddrIn6Size
+  alignment _ = sockaddrIn6Alignment
+  peek ptr    =
+    SocketAddressInet6 A.<$> peek (sin6AddrPtr ptr)
+                      <*> peek (sin6PortPtr ptr)
+                      <*> peek (sin6FlowInfoPtr ptr)
+                      <*> peek (sin6ScopeIdPtr ptr)
   poke ptr (SocketAddressInet6 a p f s) = do
-    c_memset ptr 0 (#const sizeof(struct sockaddr_in6))
-    poke (sin6_family   ptr) ((#const AF_INET6) :: Word16)
-    poke (sin6_addr     ptr) a
-    poke (sin6_port     ptr) p
-    poke (sin6_flowinfo ptr) f
-    poke (sin6_scope_id ptr) s
-    where
-      sin6_family   = (#ptr struct sockaddr_in6, sin6_family)
-      sin6_flowinfo = (#ptr struct sockaddr_in6, sin6_flowinfo)
-      sin6_scope_id = (#ptr struct sockaddr_in6, sin6_scope_id)
-      sin6_port     = (#ptr struct sockaddr_in6, sin6_port)
-      sin6_addr     = (#ptr struct in6_addr, s6_addr) . (#ptr struct sockaddr_in6, sin6_addr)
+    c_memset ptr 0 (fromIntegral c_sizeof_sockaddr_in6)
+    poke (sin6FamilyPtr ptr) (fromIntegral c_AF_INET6 :: Word16)
+    poke (sin6AddrPtr   ptr) a
+    poke (sin6PortPtr   ptr) p
+    poke (sin6FlowInfoPtr ptr) f
+    poke (sin6ScopeIdPtr ptr) s
 
 -------------------------------------------------------------------------------
 -- Address family specific socket options
@@ -336,9 +321,9 @@ data V6Only
 
 instance SocketOption V6Only where
   getSocketOption s =
-    V6Only . ((/=0) :: CInt -> Bool) <$> unsafeGetSocketOption s (#const IPPROTO_IPV6) (#const IPV6_V6ONLY)
+    V6Only . ((/=0) :: CInt -> Bool) <$> unsafeGetSocketOption s c_IPPROTO_IPV6 c_IPV6_V6ONLY
   setSocketOption s (V6Only o) =
-    unsafeSetSocketOption s (#const IPPROTO_IPV6) (#const IPV6_V6ONLY) (if o then 1 else 0 :: CInt)
+    unsafeSetSocketOption s c_IPPROTO_IPV6 c_IPV6_V6ONLY (if o then 1 else 0 :: CInt)
 
 w64_0, w64_1, w64_2, w64_3, w64_4, w64_5, w64_6, w64_7 :: Word64 -> Word8
 w64_0 x = fromIntegral $ rem (quot x $ 256*256*256*256*256*256*256) 256
@@ -359,3 +344,35 @@ w32_3 x = fromIntegral $ rem       x                                256
 w16_0, w16_1 :: Word16 -> Word8
 w16_0 x = fromIntegral $ rem (quot x $                         256) 256
 w16_1 x = fromIntegral $ rem       x                                256
+
+sockaddrIn6Size :: Int
+sockaddrIn6Size = fromIntegral c_sizeof_sockaddr_in6
+
+sockaddrIn6Alignment :: Int
+sockaddrIn6Alignment = fromIntegral c_alignof_sockaddr_in6
+
+sockaddrIn6Sin6FamilyOffset, sockaddrIn6Sin6PortOffset, sockaddrIn6Sin6FlowInfoOffset :: Int
+sockaddrIn6Sin6ScopeIdOffset, sockaddrIn6Sin6AddrOffset :: Int
+sockaddrIn6Sin6FamilyOffset   = fromIntegral c_offset_sockaddr_in6_sin6_family
+sockaddrIn6Sin6PortOffset     = fromIntegral c_offset_sockaddr_in6_sin6_port
+sockaddrIn6Sin6FlowInfoOffset = fromIntegral c_offset_sockaddr_in6_sin6_flowinfo
+sockaddrIn6Sin6ScopeIdOffset  = fromIntegral c_offset_sockaddr_in6_sin6_scope_id
+sockaddrIn6Sin6AddrOffset     = fromIntegral c_offset_sockaddr_in6_sin6_addr
+
+in6AddrDataOffset :: Int
+in6AddrDataOffset = fromIntegral c_offset_in6_addr_s6_addr
+
+sin6FamilyPtr :: Ptr (SocketAddress Inet6) -> Ptr Word16
+sin6FamilyPtr = (`plusPtr` sockaddrIn6Sin6FamilyOffset) . castPtr
+
+sin6PortPtr :: Ptr (SocketAddress Inet6) -> Ptr Inet6Port
+sin6PortPtr = (`plusPtr` sockaddrIn6Sin6PortOffset) . castPtr
+
+sin6FlowInfoPtr :: Ptr (SocketAddress Inet6) -> Ptr Inet6FlowInfo
+sin6FlowInfoPtr = (`plusPtr` sockaddrIn6Sin6FlowInfoOffset) . castPtr
+
+sin6ScopeIdPtr :: Ptr (SocketAddress Inet6) -> Ptr Inet6ScopeId
+sin6ScopeIdPtr = (`plusPtr` sockaddrIn6Sin6ScopeIdOffset) . castPtr
+
+sin6AddrPtr :: Ptr (SocketAddress Inet6) -> Ptr Inet6Address
+sin6AddrPtr = (`plusPtr` (sockaddrIn6Sin6AddrOffset + in6AddrDataOffset)) . castPtr

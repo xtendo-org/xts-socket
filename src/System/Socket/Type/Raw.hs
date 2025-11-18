@@ -1,19 +1,18 @@
 --------------------------------------------------------------------------------
 -- |
--- Module      :  System.Socket.Protocol.Default
+-- Module      :  System.Socket.Type.Raw
 -- Copyright   :  (c) Lars Petersen 2015
 -- License     :  MIT
 --
 -- Maintainer  :  info@lars-petersen.net
 -- Stability   :  experimental
 --------------------------------------------------------------------------------
-module System.Socket.Protocol.Default where
+module System.Socket.Type.Raw where
 
+import System.Socket.Internal.Constants
 import System.Socket.Internal.Socket
 
-#include "hs_socket.h"
+data Raw
 
-data Default
-
-instance Protocol Default where
-  protocolNumber _ = 0
+instance Type Raw where
+  typeNumber _ = c_SOCK_RAW

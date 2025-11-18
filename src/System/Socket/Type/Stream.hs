@@ -37,13 +37,12 @@ import qualified Data.ByteString.Lazy as LBS
 
 import System.Socket
 import System.Socket.Unsafe
-
-#include "hs_socket.h"
+import System.Socket.Internal.Constants
 
 data Stream
 
 instance Type Stream where
-  typeNumber _ = (#const SOCK_STREAM)
+  typeNumber _ = c_SOCK_STREAM
 
 -- | Sends a whole `BS.ByteString` with as many system calls as necessary
 --   and returns the bytes sent (in this case just the `BS.ByteString`s

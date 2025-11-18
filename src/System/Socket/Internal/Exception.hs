@@ -52,7 +52,7 @@ import Control.Exception
 import Data.Typeable
 import Foreign.C.Types
 
-#include "hs_socket.h"
+import System.Socket.Internal.Constants
 
 -- | Contains the error code that can be matched against.
 --
@@ -110,157 +110,157 @@ instance Show SocketException where
 
 -- | No error.
 eOk                         :: SocketException
-eOk                          = SocketException (#const SEOK)
+eOk                          = SocketException c_SEOK
 
 -- | Interrupted system call.
 --
 --   NOTE: This exception shall not be thrown by any public operation in this
 --   library, but is handled internally.
 eInterrupted                :: SocketException
-eInterrupted                 = SocketException (#const SEINTR)
+eInterrupted                 = SocketException c_SEINTR
 
 -- | Bad file descriptor.
 eBadFileDescriptor          :: SocketException
-eBadFileDescriptor           = SocketException (#const SEBADF)
+eBadFileDescriptor           = SocketException c_SEBADF
 
 -- | Permission denied.
 ePermissionDenied           :: SocketException
-ePermissionDenied            = SocketException (#const SEACCES)
+ePermissionDenied            = SocketException c_SEACCES
 
 -- | Invalid argument.
 eInvalid                    :: SocketException
-eInvalid                     = SocketException (#const SEINVAL)
+eInvalid                     = SocketException c_SEINVAL
 
 -- | Broken pipe.
 ePipe                       :: SocketException
-ePipe                        = SocketException (#const SEPIPE)
+ePipe                        = SocketException c_SEPIPE
 
 -- | Resource temporarily unavailable.
 --
 --   NOTE: This exception shall not be thrown by any public operation in this
 --   library, but is handled internally.
 eWouldBlock                 :: SocketException
-eWouldBlock                  = SocketException (#const SEWOULDBLOCK)
+eWouldBlock                  = SocketException c_SEWOULDBLOCK
 
 -- | Resource temporarily unavailable.
 eAgain                      :: SocketException
-eAgain                       = SocketException (#const SEAGAIN)
+eAgain                       = SocketException c_SEAGAIN
 
 -- | Socket operation on non-socket.
 --
 --  NOTE: This should be ruled out by the type system.
 eNotSocket                  :: SocketException
-eNotSocket                   = SocketException (#const SENOTSOCK)
+eNotSocket                   = SocketException c_SENOTSOCK
 
 -- | Destination address required.
 eDestinationAddressRequired :: SocketException
-eDestinationAddressRequired  = SocketException (#const SEDESTADDRREQ)
+eDestinationAddressRequired  = SocketException c_SEDESTADDRREQ
 
 -- | Message too long.
 eMessageSize                :: SocketException
-eMessageSize                 = SocketException (#const SEMSGSIZE)
+eMessageSize                 = SocketException c_SEMSGSIZE
 
 -- | Protocol wrong type for socket.
 
 --  NOTE: This should be ruled out by the type system.
 eProtocolType               :: SocketException
-eProtocolType                = SocketException (#const SEPROTOTYPE)
+eProtocolType                = SocketException c_SEPROTOTYPE
 
 -- | Protocol not available.
 eNoProtocolOption           :: SocketException
-eNoProtocolOption            = SocketException (#const SENOPROTOOPT)
+eNoProtocolOption            = SocketException c_SENOPROTOOPT
 
 -- | Protocol not supported.
 eProtocolNotSupported       :: SocketException
-eProtocolNotSupported        = SocketException (#const SEPROTONOSUPPORT)
+eProtocolNotSupported        = SocketException c_SEPROTONOSUPPORT
 
 -- | Socket type not supported.
 eSocketTypeNotSupported     :: SocketException
-eSocketTypeNotSupported      = SocketException (#const SESOCKTNOSUPPORT)
+eSocketTypeNotSupported      = SocketException c_SESOCKTNOSUPPORT
 
 -- | Operation not supported.
 eOperationNotSupported      :: SocketException
-eOperationNotSupported       = SocketException (#const SEOPNOTSUPP)
+eOperationNotSupported       = SocketException c_SEOPNOTSUPP
 
 -- | Protocol family not supported.
 eProtocolFamilyNotSupported :: SocketException
-eProtocolFamilyNotSupported  = SocketException (#const SEPFNOSUPPORT)
+eProtocolFamilyNotSupported  = SocketException c_SEPFNOSUPPORT
 
 -- | Address family not supported by protocol.
 eAddressFamilyNotSupported  :: SocketException
-eAddressFamilyNotSupported   = SocketException (#const SEAFNOSUPPORT)
+eAddressFamilyNotSupported   = SocketException c_SEAFNOSUPPORT
 
 -- | Address already in use.
 eAddressInUse               :: SocketException
-eAddressInUse                = SocketException (#const SEADDRINUSE)
+eAddressInUse                = SocketException c_SEADDRINUSE
 
 -- | Cannot assign requested address.
 eAddressNotAvailable        :: SocketException
-eAddressNotAvailable         = SocketException (#const SEADDRNOTAVAIL)
+eAddressNotAvailable         = SocketException c_SEADDRNOTAVAIL
 
 -- | Network is down.
 eNetworkDown                :: SocketException
-eNetworkDown                 = SocketException (#const SENETDOWN)
+eNetworkDown                 = SocketException c_SENETDOWN
 
 -- | Network is unreachable.
 eNetworkUnreachable         :: SocketException
-eNetworkUnreachable          = SocketException (#const SENETUNREACH)
+eNetworkUnreachable          = SocketException c_SENETUNREACH
 
 -- | Network dropped connection on reset.
 eNetworkReset               :: SocketException
-eNetworkReset                = SocketException (#const SENETRESET)
+eNetworkReset                = SocketException c_SENETRESET
 
 -- | Software caused connection abort.
 eConnectionAborted          :: SocketException
-eConnectionAborted           = SocketException (#const SECONNABORTED)
+eConnectionAborted           = SocketException c_SECONNABORTED
 
 -- | Connection reset by peer.
 eConnectionReset            :: SocketException
-eConnectionReset             = SocketException (#const SECONNRESET)
+eConnectionReset             = SocketException c_SECONNRESET
 
 -- | No buffer space available.
 eNoBufferSpace              :: SocketException
-eNoBufferSpace               = SocketException (#const SENOBUFS)
+eNoBufferSpace               = SocketException c_SENOBUFS
 
 -- | Transport endpoint is already connected.
 eIsConnected                :: SocketException
-eIsConnected                 = SocketException (#const SEISCONN)
+eIsConnected                 = SocketException c_SEISCONN
 
 -- | Transport endpoint is not connected.
 eNotConnected               :: SocketException
-eNotConnected                = SocketException (#const SENOTCONN)
+eNotConnected                = SocketException c_SENOTCONN
 
 -- | Cannot send after transport endpoint shutdown.
 eShutdown                   :: SocketException
-eShutdown                    = SocketException (#const SESHUTDOWN)
+eShutdown                    = SocketException c_SESHUTDOWN
 
 -- | Too many references: cannot splice.
 eTooManyReferences          :: SocketException
-eTooManyReferences           = SocketException (#const SETOOMANYREFS)
+eTooManyReferences           = SocketException c_SETOOMANYREFS
 
 -- | Connection timed out.
 eTimedOut                   :: SocketException
-eTimedOut                    = SocketException (#const SETIMEDOUT)
+eTimedOut                    = SocketException c_SETIMEDOUT
 
 -- | Connection refused.
 eConnectionRefused          :: SocketException
-eConnectionRefused           = SocketException (#const SECONNREFUSED)
+eConnectionRefused           = SocketException c_SECONNREFUSED
 
 -- | Host is down.
 eHostDown                   :: SocketException
-eHostDown                    = SocketException (#const SEHOSTDOWN)
+eHostDown                    = SocketException c_SEHOSTDOWN
 
 -- | No route to host.
 eHostUnreachable            :: SocketException
-eHostUnreachable             = SocketException (#const SEHOSTUNREACH)
+eHostUnreachable             = SocketException c_SEHOSTUNREACH
 
 -- | Operation already in progress.
 --
 --   NOTE: This exception shall not be thrown by any public operation in this
 --   library, but is handled internally.
 eAlready                    :: SocketException
-eAlready                     = SocketException (#const SEALREADY)
+eAlready                     = SocketException c_SEALREADY
 
 -- | Operation now in progress
 eInProgress                 :: SocketException
-eInProgress                  = SocketException (#const SEINPROGRESS)
+eInProgress                  = SocketException c_SEINPROGRESS

@@ -18,10 +18,10 @@ tested-with:         GHC==9.8.4, GHC==9.10.3, GHC==9.12.2
 extra-source-files:  README.md
                      CHANGELOG.md
                      CONTRIBUTORS.txt
-                     platform/linux/src/System/Socket/Internal/Platform.hsc
+                     platform/linux/src/System/Socket/Internal/Platform.hs
                      platform/linux/include/hs_socket.h
                      platform/linux/cbits/hs_socket.c
-                     platform/win32/src/System/Socket/Internal/Platform.hsc
+                     platform/win32/src/System/Socket/Internal/Platform.hs
                      platform/win32/include/hs_socket.h
                      platform/win32/cbits/hs_socket.c
 
@@ -42,11 +42,11 @@ library
                      , System.Socket.Internal.Exception
                      , System.Socket.Internal.Message
                      , System.Socket.Internal.AddressInfo
+                     , System.Socket.Internal.Constants
                      , System.Socket.Internal.Platform
   build-depends:       base >= 4.7 && < 5
                      , bytestring >= 0.11 && < 0.13
   hs-source-dirs:      src
-  build-tools:         hsc2hs
   default-language:    Haskell2010
   install-includes:    hs_socket.h
   ghc-options:         -Wall

@@ -1,19 +1,18 @@
 --------------------------------------------------------------------------------
 -- |
--- Module      :  System.Socket.Type.Datagram
+-- Module      :  System.Socket.Type.SequentialPacket
 -- Copyright   :  (c) Lars Petersen 2015
 -- License     :  MIT
 --
 -- Maintainer  :  info@lars-petersen.net
 -- Stability   :  experimental
 --------------------------------------------------------------------------------
-module System.Socket.Type.Datagram where
+module System.Socket.Type.SequentialPacket where
 
+import System.Socket.Internal.Constants
 import System.Socket.Internal.Socket
 
-#include "hs_socket.h"
+data SequentialPacket
 
-data Datagram
-
-instance Type Datagram where
-  typeNumber _ = (#const SOCK_DGRAM)
+instance Type SequentialPacket where
+  typeNumber _ = c_SOCK_SEQPACKET

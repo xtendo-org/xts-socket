@@ -1,6 +1,7 @@
 #define _GNU_SOURCE
 
 #include <stdint.h>
+#include <stddef.h>
 #include <string.h>
 #include <unistd.h>
 #include <fcntl.h>
@@ -12,6 +13,12 @@
 #include "netinet/in.h"
 #include <netinet/tcp.h>
 #include "netdb.h"
+
+#if defined(_MSC_VER)
+#define HS_ALIGNOF(type) __alignof(type)
+#else
+#define HS_ALIGNOF(type) __alignof__(type)
+#endif
 
 int hs_socket  (int domain, int type, int protocol, int *err);
 int hs_connect (int fd, const struct sockaddr *name, int namelen, int *err);
@@ -27,6 +34,29 @@ int hs_recvfrom(int fd,       void *buf, size_t len, int flags, struct sockaddr 
 
 int hs_getsockopt(int fd, int level, int option_name,       void *option_value, int *option_len, int *err);
 int hs_setsockopt(int fd, int level, int option_name, const void *option_value, int  option_len, int *err);
+
+#define HS_SIZEOF_ADDRINFO                  (sizeof(struct addrinfo))
+#define HS_SIZEOF_SOCKADDR_IN               (sizeof(struct sockaddr_in))
+#define HS_SIZEOF_SOCKADDR_IN6              (sizeof(struct sockaddr_in6))
+#define HS_ALIGNOF_SOCKADDR_IN              HS_ALIGNOF(struct sockaddr_in)
+#define HS_ALIGNOF_SOCKADDR_IN6             HS_ALIGNOF(struct sockaddr_in6)
+#define HS_OFFSETOF_ADDRINFO_AI_FLAGS       offsetof(struct addrinfo, ai_flags)
+#define HS_OFFSETOF_ADDRINFO_AI_FAMILY      offsetof(struct addrinfo, ai_family)
+#define HS_OFFSETOF_ADDRINFO_AI_SOCKTYPE    offsetof(struct addrinfo, ai_socktype)
+#define HS_OFFSETOF_ADDRINFO_AI_PROTOCOL    offsetof(struct addrinfo, ai_protocol)
+#define HS_OFFSETOF_ADDRINFO_AI_ADDR        offsetof(struct addrinfo, ai_addr)
+#define HS_OFFSETOF_ADDRINFO_AI_CANONNAME   offsetof(struct addrinfo, ai_canonname)
+#define HS_OFFSETOF_ADDRINFO_AI_NEXT        offsetof(struct addrinfo, ai_next)
+#define HS_OFFSETOF_SOCKADDR_IN_SIN_FAMILY  offsetof(struct sockaddr_in, sin_family)
+#define HS_OFFSETOF_SOCKADDR_IN_SIN_PORT    offsetof(struct sockaddr_in, sin_port)
+#define HS_OFFSETOF_SOCKADDR_IN_SIN_ADDR    offsetof(struct sockaddr_in, sin_addr)
+#define HS_OFFSETOF_SOCKADDR_IN6_SIN6_FAMILY    offsetof(struct sockaddr_in6, sin6_family)
+#define HS_OFFSETOF_SOCKADDR_IN6_SIN6_PORT      offsetof(struct sockaddr_in6, sin6_port)
+#define HS_OFFSETOF_SOCKADDR_IN6_SIN6_FLOWINFO  offsetof(struct sockaddr_in6, sin6_flowinfo)
+#define HS_OFFSETOF_SOCKADDR_IN6_SIN6_SCOPE_ID  offsetof(struct sockaddr_in6, sin6_scope_id)
+#define HS_OFFSETOF_SOCKADDR_IN6_SIN6_ADDR      offsetof(struct sockaddr_in6, sin6_addr)
+#define HS_OFFSETOF_IN_ADDR_S_ADDR          offsetof(struct in_addr, s_addr)
+#define HS_OFFSETOF_IN6_ADDR_S6_ADDR        offsetof(struct in6_addr, s6_addr)
 
 #define SEOK                   0
 #define SEINTR                 EINTR

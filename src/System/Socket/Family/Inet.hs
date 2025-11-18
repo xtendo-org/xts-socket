@@ -46,18 +46,13 @@ import Foreign.Storable
 
 import System.Socket.Internal.Socket
 import System.Socket.Internal.Platform
-
-#include "hs_socket.h"
-
-#if __GLASGOW_HASKELL__ < 800
-#let alignment t = "%lu", (unsigned long)offsetof(struct {char x__; t (y__); }, y__)
-#endif
+import System.Socket.Internal.Constants
 
 -- | The [Internet Protocol version 4](https://en.wikipedia.org/wiki/IPv4).
 data Inet
 
 instance Family Inet where
-  familyNumber _ = (#const AF_INET)
+  familyNumber _ = c_AF_INET
   -- | An [IPv4](https://en.wikipedia.org/wiki/IPv4) socket address.
   --
   --   The socket address contains a port number that may be used by transport
@@ -145,8 +140,8 @@ instance Show InetAddress where
     $ map (\p-> show $ a `div` 256^p `mod` 256) [3,2,1,0 :: Word32]
 
 instance Storable InetPort where
-  sizeOf   _  = (#size      uint16_t)
-  alignment _ = (#alignment uint16_t)
+  sizeOf   _  = sizeOf (undefined :: Word16)
+  alignment _ = alignment (undefined :: Word16)
   peek ptr    = do
     p0 <- peekByteOff ptr 0 :: IO Word8
     p1 <- peekByteOff ptr 1 :: IO Word8
@@ -159,9 +154,32 @@ instance Storable InetPort where
       w16_0 x = fromIntegral $ rem (quot x  256) 256
       w16_1 x = fromIntegral $ rem       x       256
 
+sockaddrInSize :: Int
+sockaddrInSize = fromIntegral c_sizeof_sockaddr_in
+
+sockaddrInAlignment :: Int
+sockaddrInAlignment = fromIntegral c_alignof_sockaddr_in
+
+sockaddrInSinFamilyOffset, sockaddrInSinPortOffset, sockaddrInSinAddrOffset :: Int
+sockaddrInSinFamilyOffset = fromIntegral c_offset_sockaddr_in_sin_family
+sockaddrInSinPortOffset   = fromIntegral c_offset_sockaddr_in_sin_port
+sockaddrInSinAddrOffset   = fromIntegral c_offset_sockaddr_in_sin_addr
+
+inAddrSAddrOffset :: Int
+inAddrSAddrOffset = fromIntegral c_offset_in_addr_s_addr
+
+sinFamilyPtr :: Ptr (SocketAddress Inet) -> Ptr Word16
+sinFamilyPtr = (`plusPtr` sockaddrInSinFamilyOffset) . castPtr
+
+sinPortPtr :: Ptr (SocketAddress Inet) -> Ptr InetPort
+sinPortPtr = (`plusPtr` sockaddrInSinPortOffset) . castPtr
+
+sinAddrPtr :: Ptr (SocketAddress Inet) -> Ptr InetAddress
+sinAddrPtr = (`plusPtr` (sockaddrInSinAddrOffset + inAddrSAddrOffset)) . castPtr
+
 instance Storable InetAddress where
-  sizeOf   _  = (#size      uint32_t)
-  alignment _ = (#alignment uint32_t)
+  sizeOf   _  = sizeOf (undefined :: Word32)
+  alignment _ = alignment (undefined :: Word32)
   peek ptr    = do
     i0  <- peekByteOff ptr 0 :: IO Word8
     i1  <- peekByteOff ptr 1 :: IO Word8
@@ -177,21 +195,14 @@ instance Storable InetAddress where
     pokeByteOff ptr 3 (fromIntegral $ rem       a $              256 :: Word8)
 
 instance Storable (SocketAddress Inet) where
-  sizeOf    _ = (#size struct sockaddr_in)
-  alignment _ = (#alignment struct sockaddr_in)
+  sizeOf    _ = sockaddrInSize
+  alignment _ = sockaddrInAlignment
   peek ptr    = do
-    a  <- peek (sin_addr ptr)
-    p  <- peek (sin_port ptr)
+    a  <- peek (sinAddrPtr ptr)
+    p  <- peek (sinPortPtr ptr)
     return $ SocketAddressInet a p
-    where
-      sin_addr     = (#ptr struct in_addr, s_addr) . (#ptr struct sockaddr_in, sin_addr)
-      sin_port     = (#ptr struct sockaddr_in, sin_port)
   poke ptr (SocketAddressInet a p) = do
-    c_memset ptr 0 (#const sizeof(struct sockaddr_in))
-    poke        (sin_family   ptr) ((#const AF_INET) :: Word16)
-    poke        (sin_addr     ptr) a
-    poke        (sin_port     ptr) p
-    where
-      sin_family   = (#ptr struct sockaddr_in, sin_family)
-      sin_addr     = (#ptr struct in_addr, s_addr) . (#ptr struct sockaddr_in, sin_addr)
-      sin_port     = (#ptr struct sockaddr_in, sin_port)
+    c_memset ptr 0 (fromIntegral c_sizeof_sockaddr_in)
+    poke        (sinFamilyPtr ptr) (fromIntegral c_AF_INET :: Word16)
+    poke        (sinAddrPtr   ptr) a
+    poke        (sinPortPtr   ptr) p

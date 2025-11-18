@@ -26,7 +26,7 @@ import Data.Semigroup as Sem
 import Foreign.C.Types
 import Foreign.Storable
 
-#include "hs_socket.h"
+import System.Socket.Internal.Constants
 
 -- | Use the `Data.Monoid.Monoid` instance to combine several flags:
 --
@@ -88,14 +88,14 @@ instance Show MessageFlags where
 --   __/multi-threaded environments anyway. Although GHC's RTS ignores the/__
 --   __/signal by default it causes an unnecessary interruption./__
 msgNoSignal         :: MessageFlags
-msgNoSignal          = MessageFlags (#const MSG_NOSIGNAL)
+msgNoSignal          = MessageFlags c_MSG_NOSIGNAL
 
 -- | @MSG_EOR@
 --
 --   Used by `System.Socket.Type.SequentialPacket.SequentialPacket` to mark record boundaries.
 --   Consult the POSIX standard for details.
 msgEndOfRecord      :: MessageFlags
-msgEndOfRecord       = MessageFlags (#const MSG_EOR)
+msgEndOfRecord       = MessageFlags c_MSG_EOR
 {-# WARNING msgEndOfRecord "Untested: Use at your own risk!" #-}
 
 -- | @MSG_OOB@
@@ -103,7 +103,7 @@ msgEndOfRecord       = MessageFlags (#const MSG_EOR)
 --   Used to send and receive out-of-band data. Consult the relevant standards
 --   for details.
 msgOutOfBand        :: MessageFlags
-msgOutOfBand         = MessageFlags (#const MSG_OOB)
+msgOutOfBand         = MessageFlags c_MSG_OOB
 {-# WARNING msgOutOfBand "Untested: Use at your own risk!" #-}
 
 -- | @MSG_WAITALL@
@@ -111,7 +111,7 @@ msgOutOfBand         = MessageFlags (#const MSG_OOB)
 --   A `System.Socket.receive` call shall not return unless the requested number of
 --   bytes becomes available.
 msgWaitAll          :: MessageFlags
-msgWaitAll           = MessageFlags (#const MSG_WAITALL)
+msgWaitAll           = MessageFlags c_MSG_WAITALL
 {-# WARNING msgWaitAll "Untested: Use at your own risk!" #-}
 
 -- | @MSG_PEEK@
@@ -119,4 +119,4 @@ msgWaitAll           = MessageFlags (#const MSG_WAITALL)
 --   A `System.Socket.receive` shall not actually remove the received
 --   data from the input buffer.
 msgPeek             :: MessageFlags
-msgPeek              = MessageFlags (#const MSG_PEEK)
+msgPeek              = MessageFlags c_MSG_PEEK

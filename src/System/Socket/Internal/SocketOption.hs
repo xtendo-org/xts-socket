@@ -29,8 +29,7 @@ import Foreign.Marshal.Alloc
 import System.Socket.Internal.Socket
 import System.Socket.Internal.Platform
 import System.Socket.Internal.Exception
-
-#include "hs_socket.h"
+import System.Socket.Internal.Constants
 
 -- | `SocketOption`s allow to read and write certain properties of a socket.
 --
@@ -62,7 +61,7 @@ data Error
 
 instance SocketOption Error where
   getSocketOption s =
-    Error . SocketException Control.Applicative.<$> unsafeGetSocketOption s (#const SOL_SOCKET) (#const SO_ERROR)
+    Error . SocketException Control.Applicative.<$> unsafeGetSocketOption s c_SOL_SOCKET c_SO_ERROR
   setSocketOption _ _ = throwIO eInvalid
 
 -- | Allows or disallows the reuse of a local address in a `System.Socket.bind` call.
@@ -75,9 +74,9 @@ data ReuseAddress
 
 instance SocketOption ReuseAddress where
   getSocketOption s =
-    ReuseAddress . ((/=0) :: CInt -> Bool) <$> unsafeGetSocketOption s (#const SOL_SOCKET) (#const SO_REUSEADDR)
+    ReuseAddress . ((/=0) :: CInt -> Bool) <$> unsafeGetSocketOption s c_SOL_SOCKET c_SO_REUSEADDR
   setSocketOption s (ReuseAddress o) =
-    unsafeSetSocketOption s (#const SOL_SOCKET) (#const SO_REUSEADDR) (if o then 1 else 0 :: CInt)
+    unsafeSetSocketOption s c_SOL_SOCKET c_SO_REUSEADDR (if o then 1 else 0 :: CInt)
 
 -- | When enabled the protocol checks in a protocol-specific manner
 --   if the other end is still alive.
@@ -89,9 +88,9 @@ data KeepAlive
 
 instance SocketOption KeepAlive where
   getSocketOption s =
-    KeepAlive . ((/=0) :: CInt -> Bool) <$> unsafeGetSocketOption s (#const SOL_SOCKET) (#const SO_KEEPALIVE)
+    KeepAlive . ((/=0) :: CInt -> Bool) <$> unsafeGetSocketOption s c_SOL_SOCKET c_SO_KEEPALIVE
   setSocketOption s (KeepAlive o) =
-    unsafeSetSocketOption s (#const SOL_SOCKET) (#const SO_KEEPALIVE) (if o then 1 else 0 :: CInt)
+    unsafeSetSocketOption s c_SOL_SOCKET c_SO_KEEPALIVE (if o then 1 else 0 :: CInt)
 
 -------------------------------------------------------------------------------
 -- Unsafe helpers

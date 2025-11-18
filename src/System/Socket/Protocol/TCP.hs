@@ -13,13 +13,12 @@ import Foreign.C.Types
 
 import System.Socket.Internal.Socket
 import System.Socket.Internal.SocketOption
-
-#include "hs_socket.h"
+import System.Socket.Internal.Constants
 
 data TCP
 
 instance Protocol TCP where
-  protocolNumber _ = (#const IPPROTO_TCP)
+  protocolNumber _ = c_IPPROTO_TCP
 
 -- | If set to True, disable the Nagle's algorithm.
 --
@@ -30,6 +29,6 @@ data NoDelay
 
 instance SocketOption NoDelay where
   getSocketOption s =
-    (NoDelay . (/=0) :: CInt -> NoDelay) `fmap` unsafeGetSocketOption s (#const IPPROTO_TCP) (#const TCP_NODELAY)
+    (NoDelay . (/=0) :: CInt -> NoDelay) `fmap` unsafeGetSocketOption s c_IPPROTO_TCP c_TCP_NODELAY
   setSocketOption s (NoDelay o) =
-    unsafeSetSocketOption s (#const IPPROTO_TCP) (#const TCP_NODELAY) (if o then 1 else 0 :: CInt)
+    unsafeSetSocketOption s c_IPPROTO_TCP c_TCP_NODELAY (if o then 1 else 0 :: CInt)

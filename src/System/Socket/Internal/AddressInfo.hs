@@ -52,19 +52,13 @@ import qualified Data.ByteString as BS
 import Foreign.Ptr
 import Foreign.Storable
 import Foreign.C.Types
-import Foreign.C.String
 import Foreign.Marshal.Alloc
 
 import System.Socket.Family.Inet
 import System.Socket.Family.Inet6
 import System.Socket.Internal.Socket
 import System.Socket.Internal.Platform
-
-#include "hs_socket.h"
-
-#if __GLASGOW_HASKELL__ < 800
-#let alignment t = "%lu", (unsigned long)offsetof(struct {char x__; t (y__); }, y__)
-#endif
+import System.Socket.Internal.Constants
 
 data AddressInfo f t p
    = AddressInfo
@@ -109,39 +103,39 @@ instance Exception AddressInfoException
 
 -- | > AddressInfoException "Temporary failure in name resolution"
 eaiAgain    :: AddressInfoException
-eaiAgain     = AddressInfoException (#const EAI_AGAIN)
+eaiAgain     = AddressInfoException c_EAI_AGAIN
 
 -- | > AddressInfoException "Bad value for ai_flags"
 eaiBadFlags :: AddressInfoException
-eaiBadFlags  = AddressInfoException (#const EAI_BADFLAGS)
+eaiBadFlags  = AddressInfoException c_EAI_BADFLAGS
 
 -- | > AddressInfoException "Non-recoverable failure in name resolution"
 eaiFail     :: AddressInfoException
-eaiFail      = AddressInfoException (#const EAI_FAIL)
+eaiFail      = AddressInfoException c_EAI_FAIL
 
 -- | > AddressInfoException "ai_family not supported"
 eaiFamily   :: AddressInfoException
-eaiFamily    = AddressInfoException (#const EAI_FAMILY)
+eaiFamily    = AddressInfoException c_EAI_FAMILY
 
 -- | > AddressInfoException "Memory allocation failure"
 eaiMemory   :: AddressInfoException
-eaiMemory    = AddressInfoException (#const EAI_MEMORY)
+eaiMemory    = AddressInfoException c_EAI_MEMORY
 
 -- | > AddressInfoException "No such host is known"
 eaiNoName   :: AddressInfoException
-eaiNoName    = AddressInfoException (#const EAI_NONAME)
+eaiNoName    = AddressInfoException c_EAI_NONAME
 
 -- | > AddressInfoException "Servname not supported for ai_socktype"
 eaiService  :: AddressInfoException
-eaiService   = AddressInfoException (#const EAI_SERVICE)
+eaiService   = AddressInfoException c_EAI_SERVICE
 
 -- | > AddressInfoException "ai_socktype not supported"
 eaiSocketType :: AddressInfoException
-eaiSocketType  = AddressInfoException (#const EAI_SOCKTYPE)
+eaiSocketType  = AddressInfoException c_EAI_SOCKTYPE
 
 -- | > AddressInfoException "System error"
 eaiSystem   :: AddressInfoException
-eaiSystem    = AddressInfoException (#const EAI_SYSTEM)
+eaiSystem    = AddressInfoException c_EAI_SYSTEM
 
 -- | Use the `Data.Monoid.Monoid` instance to combine several flags:
 --
@@ -160,34 +154,34 @@ instance Data.Monoid.Monoid AddressInfoFlags where
 
 -- | @AI_ADDRCONFIG@:
 aiAddressConfig  :: AddressInfoFlags
-aiAddressConfig   = AddressInfoFlags (#const AI_ADDRCONFIG)
+aiAddressConfig   = AddressInfoFlags c_AI_ADDRCONFIG
 
 -- | @AI_ALL@: Return both IPv4 (as v4-mapped IPv6 address) and IPv6 addresses
 --  when `aiV4Mapped` is set independent of whether IPv6 addresses exist for
 --  this name.
 aiAll             :: AddressInfoFlags
-aiAll              = AddressInfoFlags (#const AI_ALL)
+aiAll              = AddressInfoFlags c_AI_ALL
 
 -- | @AI_CANONNAME@:
 aiCanonicalName   :: AddressInfoFlags
-aiCanonicalName    = AddressInfoFlags (#const AI_CANONNAME)
+aiCanonicalName    = AddressInfoFlags c_AI_CANONNAME
 
 -- | @AI_NUMERICHOST@:
 aiNumericHost     :: AddressInfoFlags
-aiNumericHost      = AddressInfoFlags (#const AI_NUMERICHOST)
+aiNumericHost      = AddressInfoFlags c_AI_NUMERICHOST
 
 -- | @AI_NUMERICSERV@:
 aiNumericService  :: AddressInfoFlags
-aiNumericService   = AddressInfoFlags (#const AI_NUMERICSERV)
+aiNumericService   = AddressInfoFlags c_AI_NUMERICSERV
 
 -- | @AI_PASSIVE@:
 aiPassive         :: AddressInfoFlags
-aiPassive          = AddressInfoFlags (#const AI_PASSIVE)
+aiPassive          = AddressInfoFlags c_AI_PASSIVE
 
 -- | @AI_V4MAPPED@: Return mapped IPv4 addresses if no IPv6 addresses could be found
 --   or if `aiAll` flag is set.
 aiV4Mapped        :: AddressInfoFlags
-aiV4Mapped         = AddressInfoFlags (#const AI_V4MAPPED)
+aiV4Mapped         = AddressInfoFlags c_AI_V4MAPPED
 
 -- | Use the `Data.Monoid.Monoid` instance to combine several flags:
 --
@@ -206,23 +200,23 @@ instance Monoid NameInfoFlags where
 
 -- | @NI_NAMEREQD@: Throw an exception if the hostname cannot be determined.
 niNameRequired               :: NameInfoFlags
-niNameRequired                = NameInfoFlags (#const NI_NAMEREQD)
+niNameRequired                = NameInfoFlags c_NI_NAMEREQD
 
 -- | @NI_DGRAM@: Service is datagram based (i.e. `System.Socket.Protocol.UDP.UDP`) rather than stream based (i.e. `System.Socket.Protocol.TCP.TCP`).
 niDatagram                   :: NameInfoFlags
-niDatagram                    = NameInfoFlags (#const NI_DGRAM)
+niDatagram                    = NameInfoFlags c_NI_DGRAM
 
 -- | @NI_NOFQDN@: Return only the hostname part of the fully qualified domain name for local hosts.
 niNoFullyQualifiedDomainName :: NameInfoFlags
-niNoFullyQualifiedDomainName  = NameInfoFlags (#const NI_NOFQDN)
+niNoFullyQualifiedDomainName  = NameInfoFlags c_NI_NOFQDN
 
 -- | @NI_NUMERICHOST@: Return the numeric form of the host address.
 niNumericHost                :: NameInfoFlags
-niNumericHost                 = NameInfoFlags (#const NI_NUMERICHOST)
+niNumericHost                 = NameInfoFlags c_NI_NUMERICHOST
 
 -- | @NI_NUMERICSERV@: Return the numeric form of the service address.
 niNumericService             :: NameInfoFlags
-niNumericService              = NameInfoFlags (#const NI_NUMERICSERV)
+niNumericService              = NameInfoFlags c_NI_NUMERICSERV
 
 -- | This class is for address families that support name resolution.
 class (Family f) => HasAddressInfo f where
@@ -267,9 +261,9 @@ getAddressInfo' :: forall f t p. (Family f, Storable (SocketAddress f), Type t, 
 getAddressInfo' mnode mservice (AddressInfoFlags flags) = do
   alloca $ \resultPtrPtr-> do
     poke resultPtrPtr nullPtr
-    allocaBytes (#size struct addrinfo) $ \addrInfoPtr-> do
+    allocaBytes sizeofAddrInfo $ \addrInfoPtr-> do
       -- properly initialize the struct
-      c_memset addrInfoPtr 0 (#const sizeof(struct addrinfo))
+      c_memset addrInfoPtr 0 (fromIntegral c_sizeof_addrinfo)
       poke (ai_flags addrInfoPtr) flags
       poke (ai_family addrInfoPtr) (familyNumber (undefined :: f))
       poke (ai_socktype addrInfoPtr) (typeNumber (undefined :: t))
@@ -288,13 +282,13 @@ getAddressInfo' mnode mservice (AddressInfoFlags flags) = do
                     throwIO (AddressInfoException e)
             )
   where
-    ai_flags     = (#ptr struct addrinfo, ai_flags)     :: Ptr (AddressInfo a t p) -> Ptr CInt
-    ai_family    = (#ptr struct addrinfo, ai_family)    :: Ptr (AddressInfo a t p) -> Ptr CInt
-    ai_socktype  = (#ptr struct addrinfo, ai_socktype)  :: Ptr (AddressInfo a t p) -> Ptr CInt
-    ai_protocol  = (#ptr struct addrinfo, ai_protocol)  :: Ptr (AddressInfo a t p) -> Ptr CInt
-    ai_addr      = (#ptr struct addrinfo, ai_addr)      :: Ptr (AddressInfo a t p) -> Ptr (Ptr a)
-    ai_canonname = (#ptr struct addrinfo, ai_canonname) :: Ptr (AddressInfo a t p) -> Ptr CString
-    ai_next      = (#ptr struct addrinfo, ai_next)      :: Ptr (AddressInfo a t p) -> Ptr (Ptr (AddressInfo a t p))
+    ai_flags     = (`plusPtr` addrinfoFlagsOffset)     . castPtr
+    ai_family    = (`plusPtr` addrinfoFamilyOffset)    . castPtr
+    ai_socktype  = (`plusPtr` addrinfoSockTypeOffset)  . castPtr
+    ai_protocol  = (`plusPtr` addrinfoProtocolOffset)  . castPtr
+    ai_addr      = (`plusPtr` addrinfoAddrOffset)      . castPtr
+    ai_canonname = (`plusPtr` addrinfoCanonNameOffset) . castPtr
+    ai_next      = (`plusPtr` addrinfoNextOffset)      . castPtr
     fnode = case mnode of
       Just node    -> BS.useAsCString node
       Nothing      -> \f-> f nullPtr
@@ -340,12 +334,12 @@ instance HasNameInfo Inet6 where
 getNameInfo' :: Storable a => a -> NameInfoFlags -> IO NameInfo
 getNameInfo' addr (NameInfoFlags flags) =
   alloca $ \addrPtr->
-    allocaBytes (#const NI_MAXHOST) $ \hostPtr->
-      allocaBytes (#const NI_MAXSERV) $ \servPtr-> do
+    allocaBytes niMaxHost $ \hostPtr->
+      allocaBytes niMaxServ $ \servPtr-> do
         poke addrPtr addr
         e <- c_getnameinfo addrPtr (fromIntegral $ sizeOf addr)
-                           hostPtr (#const NI_MAXHOST)
-                           servPtr (#const NI_MAXSERV)
+                           hostPtr (fromIntegral c_NI_MAXHOST)
+                           servPtr (fromIntegral c_NI_MAXSERV)
                            flags
         if e == 0 then do
           host <- BS.packCString hostPtr
@@ -353,3 +347,23 @@ getNameInfo' addr (NameInfoFlags flags) =
           return $ NameInfo host serv
         else do
           throwIO (AddressInfoException e)
+
+sizeofAddrInfo :: Int
+sizeofAddrInfo = fromIntegral c_sizeof_addrinfo
+
+niMaxHost :: Int
+niMaxHost = fromIntegral c_NI_MAXHOST
+
+niMaxServ :: Int
+niMaxServ = fromIntegral c_NI_MAXSERV
+
+addrinfoFlagsOffset, addrinfoFamilyOffset, addrinfoSockTypeOffset :: Int
+addrinfoProtocolOffset, addrinfoAddrOffset, addrinfoCanonNameOffset :: Int
+addrinfoNextOffset :: Int
+addrinfoFlagsOffset     = fromIntegral c_offset_addrinfo_ai_flags
+addrinfoFamilyOffset    = fromIntegral c_offset_addrinfo_ai_family
+addrinfoSockTypeOffset  = fromIntegral c_offset_addrinfo_ai_socktype
+addrinfoProtocolOffset  = fromIntegral c_offset_addrinfo_ai_protocol
+addrinfoAddrOffset      = fromIntegral c_offset_addrinfo_ai_addr
+addrinfoCanonNameOffset = fromIntegral c_offset_addrinfo_ai_canonname
+addrinfoNextOffset      = fromIntegral c_offset_addrinfo_ai_next

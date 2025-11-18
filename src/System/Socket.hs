@@ -154,8 +154,6 @@ import System.Socket.Internal.Message
 import System.Socket.Internal.AddressInfo
 import System.Socket.Internal.Platform
 
-#include "hs_socket.h"
-
 -- | Creates a new socket.
 --
 --   Whereas the underlying POSIX socket operation takes 3 parameters, this library

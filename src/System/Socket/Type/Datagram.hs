@@ -1,19 +1,18 @@
 --------------------------------------------------------------------------------
 -- |
--- Module      :  System.Socket.Type.Raw
+-- Module      :  System.Socket.Type.Datagram
 -- Copyright   :  (c) Lars Petersen 2015
 -- License     :  MIT
 --
 -- Maintainer  :  info@lars-petersen.net
 -- Stability   :  experimental
 --------------------------------------------------------------------------------
-module System.Socket.Type.Raw where
+module System.Socket.Type.Datagram where
 
+import System.Socket.Internal.Constants
 import System.Socket.Internal.Socket
 
-#include "hs_socket.h"
+data Datagram
 
-data Raw
-
-instance Type Raw where
-  typeNumber _ = (#const SOCK_RAW)
+instance Type Datagram where
+  typeNumber _ = c_SOCK_DGRAM

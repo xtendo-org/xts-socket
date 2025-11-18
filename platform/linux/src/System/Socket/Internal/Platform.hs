@@ -28,8 +28,6 @@ import System.Socket.Internal.Socket
 import System.Socket.Internal.Message
 import System.Socket.Internal.Exception
 
-#include "hs_socket.h"
-
 waitRead :: Socket f t p -> Int -> IO ()
 waitRead s _ = wait s threadWaitRead threadWaitReadSTM
 
