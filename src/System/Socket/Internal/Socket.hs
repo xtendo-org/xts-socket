@@ -1,5 +1,10 @@
-{-# LANGUAGE TypeFamilies, FlexibleContexts #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TypeFamilies #-}
+
 --------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+
 -- |
 -- Module      :  System.Socket.Internal.Socket
 -- Copyright   :  (c) Lars Petersen 2015
@@ -7,18 +12,17 @@
 --
 -- Maintainer  :  info@lars-petersen.net
 -- Stability   :  experimental
---------------------------------------------------------------------------------
 module System.Socket.Internal.Socket (
-    Socket (..)
-  , Family (..)
-  , Type (..)
-  , Protocol (..)
-  ) where
+  Socket (..),
+  Family (..),
+  Type (..),
+  Protocol (..),
+) where
 
-import           Control.Concurrent.MVar
-import           Foreign.C.Types
-import           Foreign.Storable
-import           System.Posix.Types
+import Control.Concurrent.MVar
+import Foreign.C.Types
+import Foreign.Storable
+import System.Posix.Types
 
 -- | A generic socket type. Use `System.Socket.socket` to create a new socket.
 --
@@ -44,18 +48,19 @@ import           System.Posix.Types
 --     Also see [this](https://mail.haskell.org/pipermail/haskell-cafe/2014-September/115823.html)
 --     thread and read the library code to see how the problem is currently circumvented.
 newtype Socket f t p
-      = Socket (MVar Fd)
+  = Socket (MVar Fd)
 
 -- | The address `Family` determines the network protocol to use.
 --
 --   The most common address families are `System.Socket.Family.Inet.Inet` (IPv4)
 --   and `System.Socket.Family.Inet6.Inet6` (IPv6).
-class Storable (SocketAddress f) => Family f where
+class (Storable (SocketAddress f)) => Family f where
   -- | The number designating this `Family` on the specific platform. This
   --   method is only exported for implementing extension libraries.
   --
   --   This function shall yield the values of constants like `AF_INET`, `AF_INET6` etc.
   familyNumber :: f -> CInt
+
   -- | The `SocketAddress` type is a [data family](https://wiki.haskell.org/GHC/Type_families#Detailed_definition_of_data_families).
   --   This allows to provide different data constructors depending on the socket
   --   family without knowing all of them in advance or the need to extend this
@@ -87,7 +92,7 @@ class Type t where
 --
 --   Use `System.Socket.Protocol.Default` to let the operating system choose
 --   a transport protocol compatible with the socket's `Type`.
-class Protocol  p where
+class Protocol p where
   -- | This number designates this `Protocol` on the specific platform. This
   --   method is only exported for implementing extension libraries.
   --
