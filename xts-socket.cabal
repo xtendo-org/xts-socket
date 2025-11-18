@@ -71,13 +71,13 @@ test-suite default
     test.hs
   build-depends:
       base >= 4.7 && < 5
-    , tasty
-    , tasty-hunit
-    , tasty-quickcheck
     , QuickCheck >= 2.9
     , async
     , bytestring
-    , socket
+    , tasty
+    , tasty-hunit
+    , tasty-quickcheck
+    , xts-socket
 
 test-suite threaded
   default-language:
@@ -92,13 +92,13 @@ test-suite threaded
     -threaded
   build-depends:
       base >= 4.7 && < 5
-    , tasty
-    , tasty-hunit
-    , tasty-quickcheck
     , QuickCheck >= 2.9
     , async
     , bytestring
-    , socket
+    , tasty
+    , tasty-hunit
+    , tasty-quickcheck
+    , xts-socket
 
 source-repository head
   type:     git
