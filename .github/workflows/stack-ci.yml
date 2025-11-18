@@ -46,32 +46,15 @@ jobs:
       STACK_RESOLVER: ${{ matrix.resolver }}
       STACK_WORK_DIR: ${{ matrix.workdir }}
     steps:
-      - name: Check pull request mergeability
-        if: ${{ github.event_name == 'pull_request' }}
-        id: mergeable
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          state=$(gh api repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }} --jq '.mergeable_state')
-          echo "mergeable_state=$state"
-          if [[ "$state" == "clean" ]]; then
-            echo "mergeable=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "mergeable=false" >> "$GITHUB_OUTPUT"
-            echo "Pull request is not auto-mergeable (state=$state); subsequent steps will be skipped."
-          fi
-
       - name: Checkout repository
-        if: ${{ github.event_name != 'pull_request' || steps.mergeable.outputs.mergeable == 'true' }}
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          repository: ${{ github.repository }}
+          ref: ${{ github.event_name == 'pull_request' && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
 
       - name: Cache Stack root and work dir
         uses: actions/cache@v4
-        if: ${{ github.event_name != 'pull_request' || steps.mergeable.outputs.mergeable == 'true' }}
         with:
           path: |
             ${{ github.workspace }}/.stack-root
@@ -82,14 +65,12 @@ jobs:
             ${{ runner.os }}-stack-
 
       - name: Install Stack
-        if: ${{ github.event_name != 'pull_request' || steps.mergeable.outputs.mergeable == 'true' }}
         uses: haskell-actions/setup@v2
         with:
           enable-stack: true
           stack-version: 'latest'
 
       - name: Run stack test
-        if: ${{ github.event_name != 'pull_request' || steps.mergeable.outputs.mergeable == 'true' }}
         shell: bash
         run: |
           set -euo pipefail
