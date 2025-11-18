@@ -1,0 +1,76 @@
+name: Stack CI
+
+on:
+  push:
+    branches: [main]
+  # pull_request workflows operate on GitHub's temporary merge commit,
+  # ensuring we test the exact code that would land on main.
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+
+jobs:
+  stack-test:
+    name: ${{ matrix.name }}
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.mergeable_state == 'clean' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: linux-lts23
+            os: ubuntu-22.04 # Jammy LTS supplies a modern glibc baseline for GNU/Linux builds.
+            resolver: lts-23.28
+            workdir: .stack-work-lts23
+          - name: linux-lts24
+            os: ubuntu-22.04 # Reuse the glibc-stable runner for the latest LTS 24 resolver.
+            resolver: lts-24.20
+            workdir: .stack-work-lts24
+          - name: windows-lts23
+            os: windows-2022 # Windows Server 2022 bundles VS 2022 build tools required by GHC.
+            resolver: lts-23.28
+            workdir: .stack-work-lts23
+          - name: windows-lts24
+            os: windows-2022 # Same runner keeps ABI parity for the latest Stackage LTS.
+            resolver: lts-24.20
+            workdir: .stack-work-lts24
+          - name: macos-lts23
+            os: macos-14 # macOS 14 runs on Apple Silicon (arm64) covering the aarch64-darwin target.
+            resolver: lts-23.28
+            workdir: .stack-work-lts23
+          - name: macos-lts24
+            os: macos-14 # Ensure the Apple Silicon job also exercises the newest resolver.
+            resolver: lts-24.20
+            workdir: .stack-work-lts24
+    runs-on: ${{ matrix.os }}
+    env:
+      STACK_ROOT: ~/.stack
+      STACK_RESOLVER: ${{ matrix.resolver }}
+      STACK_WORK_DIR: ${{ matrix.workdir }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Cache Stack root and work dir
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.stack
+            ${{ matrix.workdir }}
+          key: ${{ runner.os }}-stack-${{ matrix.resolver }}-${{ hashFiles('stack.yaml.lock') }}-${{ matrix.workdir }}
+          restore-keys: |
+            ${{ runner.os }}-stack-${{ matrix.resolver }}-
+            ${{ runner.os }}-stack-
+
+      - name: Install Stack
+        uses: haskell/actions/setup@v2
+        with:
+          enable-stack: true
+          stack-version: 'latest'
+
+      - name: Run stack test
+        shell: bash
+        run: |
+          set -euo pipefail
+          stack --resolver "${STACK_RESOLVER}" --work-dir "${STACK_WORK_DIR}" test --no-terminal
