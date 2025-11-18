@@ -52,6 +52,17 @@ int hs_setsockopt(int fd, int level, int option_name, const void *option_value, 
 #define HS_OFFSETOF_SOCKADDR_IN_SIN_FAMILY  offsetof(struct sockaddr_in, sin_family)
 #define HS_OFFSETOF_SOCKADDR_IN_SIN_PORT    offsetof(struct sockaddr_in, sin_port)
 #define HS_OFFSETOF_SOCKADDR_IN_SIN_ADDR    offsetof(struct sockaddr_in, sin_addr)
+#if defined(__APPLE__)
+#define HS_HAS_SOCKADDR_IN_LEN              1
+#define HS_HAS_SOCKADDR_IN6_LEN             1
+#define HS_OFFSETOF_SOCKADDR_IN_SIN_LEN     offsetof(struct sockaddr_in, sin_len)
+#define HS_OFFSETOF_SOCKADDR_IN6_SIN6_LEN   offsetof(struct sockaddr_in6, sin6_len)
+#else
+#define HS_HAS_SOCKADDR_IN_LEN              0
+#define HS_HAS_SOCKADDR_IN6_LEN             0
+#define HS_OFFSETOF_SOCKADDR_IN_SIN_LEN     0
+#define HS_OFFSETOF_SOCKADDR_IN6_SIN6_LEN   0
+#endif
 #define HS_OFFSETOF_SOCKADDR_IN6_SIN6_FAMILY    offsetof(struct sockaddr_in6, sin6_family)
 #define HS_OFFSETOF_SOCKADDR_IN6_SIN6_PORT      offsetof(struct sockaddr_in6, sin6_port)
 #define HS_OFFSETOF_SOCKADDR_IN6_SIN6_FLOWINFO  offsetof(struct sockaddr_in6, sin6_flowinfo)

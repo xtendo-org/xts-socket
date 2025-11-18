@@ -59,6 +59,7 @@ module System.Socket.Family.Inet6 (
 ) where
 
 import Control.Applicative as A
+import Control.Monad
 import Data.Bits ((.|.))
 import Data.Word
 import Foreign.C.Types
@@ -121,21 +122,23 @@ newtype Inet6ScopeId = Inet6ScopeId Word32
 
 -- | Deconstructs an `Inet6Address`.
 inet6AddressToTuple
-  :: Inet6Address -> (Word16, Word16, Word16, Word16, Word16, Word16, Word16, Word16)
+  :: Inet6Address
+  -> (Word16, Word16, Word16, Word16, Word16, Word16, Word16, Word16)
 inet6AddressToTuple (Inet6Address hb lb) =
   (w0 hb, w1 hb, w2 hb, w3 hb, w0 lb, w1 lb, w2 lb, w3 lb)
  where
   w0, w1, w2, w3 :: Word64 -> Word16
   w0 x = fromIntegral $ rem (quot x $ 65536 * 65536 * 65536) 65536
   w1 x = fromIntegral $ rem (quot x $ 65536 * 65536) 65536
-  w2 x = fromIntegral $ rem (quot x $ 65536) 65536
+  w2 x = fromIntegral $ rem (quot x 65536) 65536
   w3 x = fromIntegral $ rem x 65536
 
 -- | Constructs a custom `Inet6Address`.
 --
 --   > inet6AddressFromTuple (0,0,0,0,0,0,0,1) == inet6Loopback
 inet6AddressFromTuple
-  :: (Word16, Word16, Word16, Word16, Word16, Word16, Word16, Word16) -> Inet6Address
+  :: (Word16, Word16, Word16, Word16, Word16, Word16, Word16, Word16)
+  -> Inet6Address
 inet6AddressFromTuple (w0, w1, w2, w3, w4, w5, w6, w7) =
   Inet6Address hb lb
  where
@@ -388,6 +391,8 @@ instance Storable (SocketAddress Inet6) where
       <*> peek (sin6ScopeIdPtr ptr)
   poke ptr (SocketAddressInet6 a p f s) = do
     c_memset ptr 0 (fromIntegral c_sizeof_sockaddr_in6)
+    when sockaddrIn6HasLen $
+      poke (sin6LenPtr ptr) (fromIntegral sockaddrIn6Size :: Word8)
     poke (sin6FamilyPtr ptr) (fromIntegral c_AF_INET6 :: Word16)
     poke (sin6AddrPtr ptr) a
     poke (sin6PortPtr ptr) p
@@ -453,6 +458,12 @@ sockaddrIn6Sin6ScopeIdOffset = fromIntegral c_offset_sockaddr_in6_sin6_scope_id
 
 sockaddrIn6Sin6AddrOffset = fromIntegral c_offset_sockaddr_in6_sin6_addr
 
+sockaddrIn6HasLen :: Bool
+sockaddrIn6HasLen = c_has_sockaddr_in6_len /= 0
+
+sockaddrIn6Sin6LenOffset :: Int
+sockaddrIn6Sin6LenOffset = fromIntegral c_offset_sockaddr_in6_sin6_len
+
 in6AddrDataOffset :: Int
 in6AddrDataOffset = fromIntegral c_offset_in6_addr_s6_addr
 
@@ -470,3 +481,6 @@ sin6ScopeIdPtr = (`plusPtr` sockaddrIn6Sin6ScopeIdOffset) . castPtr
 
 sin6AddrPtr :: Ptr (SocketAddress Inet6) -> Ptr Inet6Address
 sin6AddrPtr = (`plusPtr` (sockaddrIn6Sin6AddrOffset + in6AddrDataOffset)) . castPtr
+
+sin6LenPtr :: Ptr (SocketAddress Inet6) -> Ptr Word8
+sin6LenPtr = (`plusPtr` sockaddrIn6Sin6LenOffset) . castPtr
