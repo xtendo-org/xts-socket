@@ -393,7 +393,7 @@ instance Storable (SocketAddress Inet6) where
     c_memset ptr 0 (fromIntegral c_sizeof_sockaddr_in6)
     when sockaddrIn6HasLen $
       poke (sin6LenPtr ptr) (fromIntegral sockaddrIn6Size :: Word8)
-    poke (sin6FamilyPtr ptr) (fromIntegral c_AF_INET6 :: Word16)
+    pokeSaFamily ptr (fromIntegral c_AF_INET6)
     poke (sin6AddrPtr ptr) a
     poke (sin6PortPtr ptr) p
     poke (sin6FlowInfoPtr ptr) f
@@ -467,9 +467,6 @@ sockaddrIn6Sin6LenOffset = fromIntegral c_offset_sockaddr_in6_sin6_len
 in6AddrDataOffset :: Int
 in6AddrDataOffset = fromIntegral c_offset_in6_addr_s6_addr
 
-sin6FamilyPtr :: Ptr (SocketAddress Inet6) -> Ptr Word16
-sin6FamilyPtr = (`plusPtr` sockaddrIn6Sin6FamilyOffset) . castPtr
-
 sin6PortPtr :: Ptr (SocketAddress Inet6) -> Ptr Inet6Port
 sin6PortPtr = (`plusPtr` sockaddrIn6Sin6PortOffset) . castPtr
 
@@ -484,3 +481,21 @@ sin6AddrPtr = (`plusPtr` (sockaddrIn6Sin6AddrOffset + in6AddrDataOffset)) . cast
 
 sin6LenPtr :: Ptr (SocketAddress Inet6) -> Ptr Word8
 sin6LenPtr = (`plusPtr` sockaddrIn6Sin6LenOffset) . castPtr
+
+saFamily6Size :: Int
+saFamily6Size = fromIntegral c_sizeof_sa_family6
+
+pokeSaFamily :: Ptr (SocketAddress Inet6) -> Word16 -> IO ()
+pokeSaFamily ptr val =
+  case saFamily6Size of
+    1 ->
+      pokeByteOff
+        (castPtr ptr)
+        sockaddrIn6Sin6FamilyOffset
+        (fromIntegral val :: Word8)
+    2 ->
+      pokeByteOff
+        (castPtr ptr)
+        sockaddrIn6Sin6FamilyOffset
+        val
+    _ -> error "Unsupported sa_family_t size for Inet6 sockets"

@@ -303,6 +303,9 @@ foreign import capi "hs_socket.h value HS_OFFSETOF_SOCKADDR_IN_SIN_ADDR"
 foreign import capi "hs_socket.h value HS_OFFSETOF_SOCKADDR_IN_SIN_LEN"
   c_offset_sockaddr_in_sin_len :: CSize
 
+foreign import capi "hs_socket.h value HS_SIZEOF_SA_FAMILY"
+  c_sizeof_sa_family :: CSize
+
 foreign import capi "hs_socket.h value HS_OFFSETOF_IN_ADDR_S_ADDR"
   c_offset_in_addr_s_addr :: CSize
 
@@ -324,6 +327,9 @@ foreign import capi "hs_socket.h value HS_OFFSETOF_SOCKADDR_IN6_SIN6_ADDR"
 
 foreign import capi "hs_socket.h value HS_OFFSETOF_SOCKADDR_IN6_SIN6_LEN"
   c_offset_sockaddr_in6_sin6_len :: CSize
+
+foreign import capi "hs_socket.h value HS_SIZEOF_SA_FAMILY6"
+  c_sizeof_sa_family6 :: CSize
 
 -- Offset within struct in6_addr
 foreign import capi "hs_socket.h value HS_OFFSETOF_IN6_ADDR_S6_ADDR"

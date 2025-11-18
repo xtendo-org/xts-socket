@@ -115,6 +115,8 @@ int hs_setsockopt(int sockfd, int level, int option_name, const void *option_val
 #define HS_OFFSETOF_SOCKADDR_IN_SIN_FAMILY  offsetof(struct sockaddr_in, sin_family)
 #define HS_OFFSETOF_SOCKADDR_IN_SIN_PORT    offsetof(struct sockaddr_in, sin_port)
 #define HS_OFFSETOF_SOCKADDR_IN_SIN_ADDR    offsetof(struct sockaddr_in, sin_addr)
+#define HS_SIZEOF_SA_FAMILY                 (sizeof(((struct sockaddr_in *)0)->sin_family))
+#define HS_SIZEOF_SA_FAMILY6                (sizeof(((struct sockaddr_in6 *)0)->sin6_family))
 #define HS_OFFSETOF_SOCKADDR_IN6_SIN6_FAMILY    offsetof(struct sockaddr_in6, sin6_family)
 #define HS_OFFSETOF_SOCKADDR_IN6_SIN6_PORT      offsetof(struct sockaddr_in6, sin6_port)
 #define HS_OFFSETOF_SOCKADDR_IN6_SIN6_FLOWINFO  offsetof(struct sockaddr_in6, sin6_flowinfo)

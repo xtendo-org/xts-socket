@@ -197,9 +197,6 @@ sockaddrInSinLenOffset = fromIntegral c_offset_sockaddr_in_sin_len
 inAddrSAddrOffset :: Int
 inAddrSAddrOffset = fromIntegral c_offset_in_addr_s_addr
 
-sinFamilyPtr :: Ptr (SocketAddress Inet) -> Ptr Word16
-sinFamilyPtr = (`plusPtr` sockaddrInSinFamilyOffset) . castPtr
-
 sinPortPtr :: Ptr (SocketAddress Inet) -> Ptr InetPort
 sinPortPtr = (`plusPtr` sockaddrInSinPortOffset) . castPtr
 
@@ -208,6 +205,24 @@ sinAddrPtr = (`plusPtr` (sockaddrInSinAddrOffset + inAddrSAddrOffset)) . castPtr
 
 sinLenPtr :: Ptr (SocketAddress Inet) -> Ptr Word8
 sinLenPtr = (`plusPtr` sockaddrInSinLenOffset) . castPtr
+
+saFamilySize :: Int
+saFamilySize = fromIntegral c_sizeof_sa_family
+
+pokeSaFamily :: Ptr (SocketAddress Inet) -> Word16 -> IO ()
+pokeSaFamily ptr val =
+  case saFamilySize of
+    1 ->
+      pokeByteOff
+        (castPtr ptr)
+        sockaddrInSinFamilyOffset
+        (fromIntegral val :: Word8)
+    2 ->
+      pokeByteOff
+        (castPtr ptr)
+        sockaddrInSinFamilyOffset
+        val
+    _ -> error "Unsupported sa_family_t size for Inet sockets"
 
 instance Storable InetAddress where
   sizeOf _ = sizeOf (undefined :: Word32)
@@ -237,6 +252,6 @@ instance Storable (SocketAddress Inet) where
     c_memset ptr 0 (fromIntegral c_sizeof_sockaddr_in)
     when sockaddrInHasLen $
       poke (sinLenPtr ptr) (fromIntegral sockaddrInSize :: Word8)
-    poke (sinFamilyPtr ptr) (fromIntegral c_AF_INET :: Word16)
+    pokeSaFamily ptr (fromIntegral c_AF_INET)
     poke (sinAddrPtr ptr) a
     poke (sinPortPtr ptr) p
