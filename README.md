@@ -2,15 +2,15 @@
 
 xts-socket is a Haskell library that provides API to the POSIX BSD-style sockets. It is a fork of the [`socket`](https://hackage.haskell.org/package/socket) package.
 
-`socket` should be a good lightweight alternative to the [`network`](https://hackage.haskell.org/package/network). However, the maintainer has left. The project's last commit was in June 2020. As of writing, that was more than five years ago. Pull requests and issues are left unanswered.
+**WARNING: This is a work in progress. Things will not work yet. Do not use this now.**
+
+Motivation: `socket` should be a good lightweight alternative to the [`network`](https://hackage.haskell.org/package/network). However, it seems the maintainer has left. The project's last commit was in June 2020. As of writing, that was more than five years ago. Pull requests and issues are left unanswered.
 
 The current goal is to configure GitHub Actions to run the tests in these environments:
 
 - GNU/Linux
 - Windows
 - macOS (aarch64-darwin)
-
-The primary development platform is x64 GNU/Linux. Once we get things working, we will configure GitHub Actions to automate the test on other platforms like Windows and macOS (aarch64-darwin; Apple Silicon).
 
 ## Principles
 
