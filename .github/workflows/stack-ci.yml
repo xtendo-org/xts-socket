@@ -43,7 +43,7 @@ jobs:
             workdir: .stack-work-lts24
     runs-on: ${{ matrix.os }}
     env:
-      STACK_ROOT: ${{ env.HOME }}/.stack
+      STACK_ROOT: ${{ github.workspace }}/.stack-root
       STACK_RESOLVER: ${{ matrix.resolver }}
       STACK_WORK_DIR: ${{ matrix.workdir }}
     steps:
@@ -56,7 +56,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: |
-            ${{ env.HOME }}/.stack
+            ${{ github.workspace }}/.stack-root
             ${{ matrix.workdir }}
           key: ${{ runner.os }}-stack-${{ matrix.resolver }}-${{ hashFiles('stack.yaml.lock') }}-${{ matrix.workdir }}
           restore-keys: |
