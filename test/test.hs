@@ -19,6 +19,12 @@ import qualified Data.ByteString.Lazy as LBS
 import Data.Int (Int64)
 import Data.Maybe (isJust)
 import Data.Monoid (mappend, mempty)
+import Data.Word (Word8)
+import Foreign.Marshal.Alloc (alloca)
+import Foreign.Marshal.Array (peekArray)
+import Foreign.Ptr (Ptr, castPtr)
+import Foreign.Storable (Storable (..))
+import System.Info (os)
 import System.Socket
 import System.Socket.Family.Inet
 import System.Socket.Family.Inet6
@@ -117,7 +123,7 @@ group01 = testGroup "connect" [testGroup "Inet/Stream/TCP" t1]
                 Left e
                   | e == eNetworkUnreachable -> return ()
                   | e == eAddressNotAvailable -> return ()
-                  | otherwise -> throwIO e
+                  | otherwise -> reportSocketDebug e (SocketAddressInet inetNone port)
                 Right () -> assertFailure "connection should have failed"
           )
     , testCase "connect to open socket on localhost" $
@@ -503,6 +509,23 @@ group80 =
               )
         ]
     ]
+
+reportSocketDebug :: SocketException -> SocketAddress Inet -> IO ()
+reportSocketDebug e addr = do
+  bytes <- dumpSocketAddressInet addr
+  assertFailure $
+    "Unexpected exception "
+      ++ show e
+      ++ " (os="
+      ++ os
+      ++ ") bytes="
+      ++ show bytes
+
+dumpSocketAddressInet :: SocketAddress Inet -> IO [Word8]
+dumpSocketAddressInet addr =
+  alloca $ \ptr -> do
+    poke ptr addr
+    peekArray (sizeOf addr) (castPtr ptr :: Ptr Word8)
 
 group98 :: TestTree
 group98 =
