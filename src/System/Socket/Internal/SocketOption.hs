@@ -1,4 +1,7 @@
 --------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+
 -- |
 -- Module      :  System.Socket.Internal.SocketOption
 -- Copyright   :  (c) Lars Petersen 2016
@@ -6,30 +9,27 @@
 --
 -- Maintainer  :  info@lars-petersen.net
 -- Stability   :  experimental
---------------------------------------------------------------------------------
 module System.Socket.Internal.SocketOption (
-    SocketOption (..)
-  , unsafeGetSocketOption
-  , unsafeSetSocketOption
-  , Error (..)
-  , ReuseAddress (..)
-  , KeepAlive(..)
-  ) where
+  SocketOption (..),
+  unsafeGetSocketOption,
+  unsafeSetSocketOption,
+  Error (..),
+  ReuseAddress (..),
+  KeepAlive (..),
+) where
 
+import Control.Applicative ((<$>))
 import Control.Concurrent.MVar
 import Control.Exception
 import Control.Monad
-import Control.Applicative ((<$>))
-
-import Foreign.Ptr
-import Foreign.Storable
 import Foreign.C.Types
 import Foreign.Marshal.Alloc
-
-import System.Socket.Internal.Socket
-import System.Socket.Internal.Platform
-import System.Socket.Internal.Exception
+import Foreign.Ptr
+import Foreign.Storable
 import System.Socket.Internal.Constants
+import System.Socket.Internal.Exception
+import System.Socket.Internal.Platform
+import System.Socket.Internal.Socket
 
 -- | `SocketOption`s allow to read and write certain properties of a socket.
 --
@@ -44,6 +44,7 @@ class SocketOption o where
   --   - This operation throws `SocketException`s. Consult @man getsockopt@ for
   --     details and specific errors.
   getSocketOption :: Socket f t p -> IO o
+
   -- | Set a specific `SocketOption`.
   --
   --   - This operation throws `SocketException`s. Consult @man setsockopt@ for
@@ -56,12 +57,13 @@ class SocketOption o where
 --   - The operation `setSocketOption` always throws `eInvalid` for  this option.
 --   - Use with care in the presence of concurrency!
 data Error
-   = Error SocketException
-   deriving (Eq, Ord, Show)
+  = Error SocketException
+  deriving (Eq, Ord, Show)
 
 instance SocketOption Error where
   getSocketOption s =
-    Error . SocketException Control.Applicative.<$> unsafeGetSocketOption s c_SOL_SOCKET c_SO_ERROR
+    Error . SocketException
+      Control.Applicative.<$> unsafeGetSocketOption s c_SOL_SOCKET c_SO_ERROR
   setSocketOption _ _ = throwIO eInvalid
 
 -- | Allows or disallows the reuse of a local address in a `System.Socket.bind` call.
@@ -69,14 +71,19 @@ instance SocketOption Error where
 --  - Also known as @SO_REUSEADDR@.
 --  - This is particularly useful when experiencing `eAddressInUse` exceptions.
 data ReuseAddress
-   = ReuseAddress Bool
-   deriving (Eq, Ord, Show)
+  = ReuseAddress Bool
+  deriving (Eq, Ord, Show)
 
 instance SocketOption ReuseAddress where
   getSocketOption s =
-    ReuseAddress . ((/=0) :: CInt -> Bool) <$> unsafeGetSocketOption s c_SOL_SOCKET c_SO_REUSEADDR
+    ReuseAddress . ((/= 0) :: CInt -> Bool)
+      <$> unsafeGetSocketOption s c_SOL_SOCKET c_SO_REUSEADDR
   setSocketOption s (ReuseAddress o) =
-    unsafeSetSocketOption s c_SOL_SOCKET c_SO_REUSEADDR (if o then 1 else 0 :: CInt)
+    unsafeSetSocketOption
+      s
+      c_SOL_SOCKET
+      c_SO_REUSEADDR
+      (if o then 1 else 0 :: CInt)
 
 -- | When enabled the protocol checks in a protocol-specific manner
 --   if the other end is still alive.
@@ -88,24 +95,30 @@ data KeepAlive
 
 instance SocketOption KeepAlive where
   getSocketOption s =
-    KeepAlive . ((/=0) :: CInt -> Bool) <$> unsafeGetSocketOption s c_SOL_SOCKET c_SO_KEEPALIVE
+    KeepAlive . ((/= 0) :: CInt -> Bool)
+      <$> unsafeGetSocketOption s c_SOL_SOCKET c_SO_KEEPALIVE
   setSocketOption s (KeepAlive o) =
-    unsafeSetSocketOption s c_SOL_SOCKET c_SO_KEEPALIVE (if o then 1 else 0 :: CInt)
+    unsafeSetSocketOption
+      s
+      c_SOL_SOCKET
+      c_SO_KEEPALIVE
+      (if o then 1 else 0 :: CInt)
 
 -------------------------------------------------------------------------------
 -- Unsafe helpers
 -------------------------------------------------------------------------------
 
-unsafeSetSocketOption :: Storable a => Socket f t p -> CInt -> CInt -> a -> IO ()
+unsafeSetSocketOption
+  :: (Storable a) => Socket f t p -> CInt -> CInt -> a -> IO ()
 unsafeSetSocketOption (Socket mfd) level name value =
-  withMVar mfd $ \fd-> alloca $ \vPtr-> alloca $ \errPtr-> do
+  withMVar mfd $ \fd -> alloca $ \vPtr -> alloca $ \errPtr -> do
     poke vPtr value
     i <- c_setsockopt fd level name vPtr (fromIntegral $ sizeOf value) errPtr
     when (i < 0) (SocketException <$> peek errPtr >>= throwIO)
 
-unsafeGetSocketOption :: Storable a => Socket f t p -> CInt -> CInt -> IO a
+unsafeGetSocketOption :: (Storable a) => Socket f t p -> CInt -> CInt -> IO a
 unsafeGetSocketOption (Socket mfd) level name =
-  withMVar mfd $ \fd-> alloca $ \vPtr-> alloca $ \lPtr-> alloca $ \errPtr-> do
+  withMVar mfd $ \fd -> alloca $ \vPtr -> alloca $ \lPtr -> alloca $ \errPtr -> do
     u <- return undefined
     poke lPtr (fromIntegral $ sizeOf u)
     i <- c_getsockopt fd level name vPtr (lPtr :: Ptr CInt) errPtr

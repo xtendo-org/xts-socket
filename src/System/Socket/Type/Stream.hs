@@ -1,4 +1,7 @@
 --------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+
 -- |
 -- Module      :  System.Socket.Type.Stream
 -- Copyright   :  (c) Lars Petersen 2015
@@ -6,38 +9,42 @@
 --
 -- Maintainer  :  info@lars-petersen.net
 -- Stability   :  experimental
---------------------------------------------------------------------------------
 module System.Socket.Type.Stream (
   -- * Stream
-    Stream
+  Stream,
+
   -- ** Specialized send operations
+
   -- *** sendAll
-  , sendAll
+  sendAll,
+
   -- *** sendAllLazy
-  , sendAllLazy
+  sendAllLazy,
+
   -- *** sendAllBuilder
-  , sendAllBuilder
+  sendAllBuilder,
+
   -- ** Specialized receive operations
+
   -- *** receiveAll
-  , receiveAll
-  ) where
+  receiveAll,
+) where
 
 import Control.Exception (throwIO)
 import Control.Monad (when)
-import Data.Int
-import Data.Word
-import Data.Monoid
-import Foreign.Ptr
-import Foreign.Marshal.Alloc
 import qualified Data.ByteString as BS
-import qualified Data.ByteString.Unsafe as BS
 import qualified Data.ByteString.Builder as BB
 import qualified Data.ByteString.Builder.Internal as BB
 import qualified Data.ByteString.Lazy as LBS
-
+import qualified Data.ByteString.Unsafe as BS
+import Data.Int
+import Data.Monoid
+import Data.Word
+import Foreign.Marshal.Alloc
+import Foreign.Ptr
 import System.Socket
-import System.Socket.Unsafe
 import System.Socket.Internal.Constants
+import System.Socket.Unsafe
 
 data Stream
 
@@ -51,11 +58,11 @@ sendAll :: Socket f Stream p -> BS.ByteString -> MessageFlags -> IO Int
 sendAll s bs flags = do
   BS.unsafeUseAsCStringLen bs (uncurry sendAllPtr)
   return (BS.length bs)
-  where
-    sendAllPtr :: Ptr a -> Int -> IO ()
-    sendAllPtr ptr len = do
-      sent <- fromIntegral `fmap` unsafeSend s ptr (fromIntegral len) flags
-      when (sent < len) $ sendAllPtr (plusPtr ptr sent) (len - sent)
+ where
+  sendAllPtr :: Ptr a -> Int -> IO ()
+  sendAllPtr ptr len = do
+    sent <- fromIntegral `fmap` unsafeSend s ptr (fromIntegral len) flags
+    when (sent < len) $ sendAllPtr (plusPtr ptr sent) (len - sent)
 
 -- | Like `sendAll`, but operates on lazy `Data.ByteString.Lazy.ByteString`s.
 --
@@ -65,11 +72,11 @@ sendAll s bs flags = do
 sendAllLazy :: Socket f Stream p -> LBS.ByteString -> MessageFlags -> IO Int64
 sendAllLazy s lbs flags =
   LBS.foldlChunks f (return 0) lbs
-  where
-    f action bs = do
-      sent  <- action
-      sent' <- fromIntegral `fmap` sendAll s bs flags
-      return $! sent + sent'
+ where
+  f action bs = do
+    sent <- action
+    sent' <- fromIntegral `fmap` sendAll s bs flags
+    return $! sent + sent'
 
 -- | Sends a whole `BB.Builder` without allocating `BS.ByteString`s.
 --   If performance is an issue, this operation should be preferred over all
@@ -79,49 +86,50 @@ sendAllLazy s lbs flags =
 --   reuses this buffer until the whole `BB.Builder` has been sent.
 --   The count of all bytes sent is returned as there is no other efficient
 --   way to determine a `BB.Builder`s size without actually building it.
-sendAllBuilder :: Socket f Stream p -> Int -> BB.Builder -> MessageFlags -> IO Int64
+sendAllBuilder
+  :: Socket f Stream p -> Int -> BB.Builder -> MessageFlags -> IO Int64
 sendAllBuilder s bufsize builder flags = do
   allocaBytes bufsize g
-  where
-    g ptr = writeStep (BB.runPut $ BB.putBuilder builder) 0
-      where
-        bufferRange :: BB.BufferRange
-        bufferRange =
-          BB.BufferRange ptr (plusPtr ptr bufsize)
-        writeStep :: BB.BuildStep a -> Int64 -> IO Int64
-        writeStep step alreadySent =
-          BB.fillWithBuildStep step whenDone whenFull whenChunk bufferRange
-          where
-            whenDone ptrToNextFreeByte _
-              | len > 0 = do
-                  sendAllPtr ptr len
-                  return $! alreadySent + fromIntegral len
-              | otherwise =
-                  return alreadySent
-              where
-                len = minusPtr ptrToNextFreeByte ptr
-            whenFull ptrToNextFreeByte minBytesRequired nextStep
-              | minBytesRequired > bufsize =
-                  throwIO eNoBufferSpace
-              | otherwise = do
-                  sendAllPtr ptr len
-                  writeStep nextStep $! alreadySent + fromIntegral len
-              where
-                len = minusPtr ptrToNextFreeByte ptr
-            whenChunk ptrToNextFreeByte bs nextStep = do
-              sendAllPtr ptr len
-              if BS.null bs
-                then
-                  writeStep nextStep $! alreadySent + fromIntegral len
-                else do
-                  bsLen <- sendAll s bs flags
-                  writeStep nextStep $! alreadySent + fromIntegral (len + bsLen)
-              where
-                len = minusPtr ptrToNextFreeByte ptr
-    sendAllPtr :: Ptr Word8 -> Int -> IO ()
-    sendAllPtr ptr len = do
-      sent <- fromIntegral `fmap` unsafeSend s ptr (fromIntegral len) flags
-      when (sent < len) $ sendAllPtr (plusPtr ptr sent) (len - sent)
+ where
+  g ptr = writeStep (BB.runPut $ BB.putBuilder builder) 0
+   where
+    bufferRange :: BB.BufferRange
+    bufferRange =
+      BB.BufferRange ptr (plusPtr ptr bufsize)
+    writeStep :: BB.BuildStep a -> Int64 -> IO Int64
+    writeStep step alreadySent =
+      BB.fillWithBuildStep step whenDone whenFull whenChunk bufferRange
+     where
+      whenDone ptrToNextFreeByte _
+        | len > 0 = do
+            sendAllPtr ptr len
+            return $! alreadySent + fromIntegral len
+        | otherwise =
+            return alreadySent
+       where
+        len = minusPtr ptrToNextFreeByte ptr
+      whenFull ptrToNextFreeByte minBytesRequired nextStep
+        | minBytesRequired > bufsize =
+            throwIO eNoBufferSpace
+        | otherwise = do
+            sendAllPtr ptr len
+            writeStep nextStep $! alreadySent + fromIntegral len
+       where
+        len = minusPtr ptrToNextFreeByte ptr
+      whenChunk ptrToNextFreeByte bs nextStep = do
+        sendAllPtr ptr len
+        if BS.null bs
+          then
+            writeStep nextStep $! alreadySent + fromIntegral len
+          else do
+            bsLen <- sendAll s bs flags
+            writeStep nextStep $! alreadySent + fromIntegral (len + bsLen)
+       where
+        len = minusPtr ptrToNextFreeByte ptr
+  sendAllPtr :: Ptr Word8 -> Int -> IO ()
+  sendAllPtr ptr len = do
+    sent <- fromIntegral `fmap` unsafeSend s ptr (fromIntegral len) flags
+    when (sent < len) $ sendAllPtr (plusPtr ptr sent) (len - sent)
 
 -- | Like `receive`, but operates on lazy `Data.ByteString.Lazy.ByteString`s and
 --   continues until either an empty part has been received (peer closed
@@ -136,18 +144,21 @@ sendAllBuilder s bufsize builder flags = do
 --     transmission is complete.
 receiveAll :: Socket f Stream p -> Int64 -> MessageFlags -> IO LBS.ByteString
 receiveAll sock maxLen flags = collect 0 Data.Monoid.mempty
-  where
-    collect len accum
-      | len > maxLen = do
-          build accum
-      | otherwise = do
-          bs <- receive sock BB.smallChunkSize flags
-          if BS.null bs then do
+ where
+  collect len accum
+    | len > maxLen = do
+        build accum
+    | otherwise = do
+        bs <- receive sock BB.smallChunkSize flags
+        if BS.null bs
+          then do
             build accum
           else do
-            collect (len + fromIntegral (BS.length bs))
-                 $! (accum `Data.Monoid.mappend` BB.byteString bs)
-    build accum = do
-      return (BB.toLazyByteString accum)
-
-{-# DEPRECATED receiveAll "Semantics will change in the next major release. Don't use it anymore!" #-}
+            collect (len + fromIntegral (BS.length bs)) $!
+              (accum `Data.Monoid.mappend` BB.byteString bs)
+  build accum = do
+    return (BB.toLazyByteString accum)
+{-# DEPRECATED
+  receiveAll
+  "Semantics will change in the next major release. Don't use it anymore!"
+  #-}

@@ -1,4 +1,7 @@
 --------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+
 -- |
 -- Module      :  System.Socket.Type.Raw
 -- Copyright   :  (c) Lars Petersen 2015
@@ -6,7 +9,6 @@
 --
 -- Maintainer  :  info@lars-petersen.net
 -- Stability   :  experimental
---------------------------------------------------------------------------------
 module System.Socket.Type.Raw where
 
 import System.Socket.Internal.Constants

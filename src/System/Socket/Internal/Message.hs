@@ -1,5 +1,9 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+
 --------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+
 -- |
 -- Module      :  System.Socket.Internal.Message
 -- Copyright   :  (c) Lars Petersen 2015
@@ -7,25 +11,22 @@
 --
 -- Maintainer  :  info@lars-petersen.net
 -- Stability   :  experimental
---------------------------------------------------------------------------------
 module System.Socket.Internal.Message (
-    MessageFlags (..)
-  , msgEndOfRecord
-  , msgNoSignal
-  , msgOutOfBand
-  , msgWaitAll
-  , msgPeek
-  ) where
+  MessageFlags (..),
+  msgEndOfRecord,
+  msgNoSignal,
+  msgOutOfBand,
+  msgWaitAll,
+  msgPeek,
+) where
 
 import Data.Bits
-import Data.Monoid
-import Data.Maybe
 import Data.List (intersperse)
+import Data.Maybe
+import Data.Monoid
 import Data.Semigroup as Sem
-
 import Foreign.C.Types
 import Foreign.Storable
-
 import System.Socket.Internal.Constants
 
 -- | Use the `Data.Monoid.Monoid` instance to combine several flags:
@@ -36,28 +37,36 @@ import System.Socket.Internal.Constants
 --
 --   > if flags .&. msgEndOfRecord /= mempty then ...
 newtype MessageFlags
-      = MessageFlags CInt
-      deriving (Eq, Bits, Storable)
+  = MessageFlags CInt
+  deriving (Eq, Bits, Storable)
 
 instance Sem.Semigroup MessageFlags where
   (<>) = (.|.)
 
 instance Monoid MessageFlags where
-  mempty  = MessageFlags 0
+  mempty = MessageFlags 0
   mappend = (Sem.<>)
 
 instance Show MessageFlags where
   show msg = "mconcat [" ++ y ++ "]"
-    where
-      x = [ if msg .&. msgEndOfRecord /= mempty then Just "msgEndOfRecord" else Nothing
-          , if msg .&. msgNoSignal    /= mempty then Just "msgNoSignal"    else Nothing
-          , if msg .&. msgOutOfBand   /= mempty then Just "msgOutOfBand"   else Nothing
-          , if msg .&. msgWaitAll     /= mempty then Just "msgWaitAll"     else Nothing
-          , if msg .&. msgWaitAll     /= mempty then Just "msgPeek"        else Nothing
-          , let (MessageFlags i) = msg `xor` (Data.Monoid.mconcat [msgEndOfRecord,msgNoSignal,msgOutOfBand,msgWaitAll,msgPeek] .&. msg)
-            in if                   i /= 0      then Just ("MessageFlags " ++ show i) else Nothing
-          ]
-      y = concat $ intersperse "," $ catMaybes x
+   where
+    x =
+      [ if msg .&. msgEndOfRecord /= mempty then Just "msgEndOfRecord" else Nothing
+      , if msg .&. msgNoSignal /= mempty then Just "msgNoSignal" else Nothing
+      , if msg .&. msgOutOfBand /= mempty then Just "msgOutOfBand" else Nothing
+      , if msg .&. msgWaitAll /= mempty then Just "msgWaitAll" else Nothing
+      , if msg .&. msgWaitAll /= mempty then Just "msgPeek" else Nothing
+      , let (MessageFlags i) =
+              msg
+                `xor` ( Data.Monoid.mconcat
+                          [msgEndOfRecord, msgNoSignal, msgOutOfBand, msgWaitAll, msgPeek]
+                          .&. msg
+                      )
+         in if i /= 0
+              then Just ("MessageFlags " ++ show i)
+              else Nothing
+      ]
+    y = concat $ intersperse "," $ catMaybes x
 
 -- | @MSG_NOSIGNAL@
 --
@@ -87,36 +96,36 @@ instance Show MessageFlags where
 --   __/explictly hook and handle the @PIPE@ signal which is not very useful in todays/__
 --   __/multi-threaded environments anyway. Although GHC's RTS ignores the/__
 --   __/signal by default it causes an unnecessary interruption./__
-msgNoSignal         :: MessageFlags
-msgNoSignal          = MessageFlags c_MSG_NOSIGNAL
+msgNoSignal :: MessageFlags
+msgNoSignal = MessageFlags c_MSG_NOSIGNAL
 
 -- | @MSG_EOR@
 --
 --   Used by `System.Socket.Type.SequentialPacket.SequentialPacket` to mark record boundaries.
 --   Consult the POSIX standard for details.
-msgEndOfRecord      :: MessageFlags
-msgEndOfRecord       = MessageFlags c_MSG_EOR
+msgEndOfRecord :: MessageFlags
+msgEndOfRecord = MessageFlags c_MSG_EOR
 {-# WARNING msgEndOfRecord "Untested: Use at your own risk!" #-}
 
 -- | @MSG_OOB@
 --
 --   Used to send and receive out-of-band data. Consult the relevant standards
 --   for details.
-msgOutOfBand        :: MessageFlags
-msgOutOfBand         = MessageFlags c_MSG_OOB
+msgOutOfBand :: MessageFlags
+msgOutOfBand = MessageFlags c_MSG_OOB
 {-# WARNING msgOutOfBand "Untested: Use at your own risk!" #-}
 
 -- | @MSG_WAITALL@
 --
 --   A `System.Socket.receive` call shall not return unless the requested number of
 --   bytes becomes available.
-msgWaitAll          :: MessageFlags
-msgWaitAll           = MessageFlags c_MSG_WAITALL
+msgWaitAll :: MessageFlags
+msgWaitAll = MessageFlags c_MSG_WAITALL
 {-# WARNING msgWaitAll "Untested: Use at your own risk!" #-}
 
 -- | @MSG_PEEK@
 --
 --   A `System.Socket.receive` shall not actually remove the received
 --   data from the input buffer.
-msgPeek             :: MessageFlags
-msgPeek              = MessageFlags c_MSG_PEEK
+msgPeek :: MessageFlags
+msgPeek = MessageFlags c_MSG_PEEK

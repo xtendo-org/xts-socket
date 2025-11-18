@@ -1,5 +1,11 @@
-{-# LANGUAGE TypeFamilies, FlexibleContexts, ScopedTypeVariables #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeFamilies #-}
+
 --------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+
 -- |
 -- Module      :  System.Socket
 -- Copyright   :  (c) Lars Petersen 2015
@@ -46,113 +52,136 @@
 -- >     putStrLn $ "Accepted connection from " ++ show addr
 -- >     sendAll p "Hello world!" msgNoSignal
 -- >   )
---------------------------------------------------------------------------------
 module System.Socket (
   -- * Socket
-    Socket ()
-  , SocketAddress ()
-  -- ** Family
-  , Family (..)
-  -- ** Type
-  , Type (..)
-  -- ** Protocol
-  , Protocol  (..)
-  -- * Operations
-  -- ** socket
-  , socket
-  -- ** connect
-  , connect
-  -- ** bind
-  , bind
-  -- ** listen
-  , listen
-  -- ** accept
-  , accept
-  -- ** send, sendTo
-  , send, sendTo
-  -- ** receive, receiveFrom
-  , receive, receiveFrom
-  -- ** close
-  , close
-  -- * Name Resolution
-  -- ** getAddress
-  , getAddress
-  -- ** getAddressInfo
-  , AddressInfo (..)
-  , HasAddressInfo (..)
-  -- ** getNameInfo
-  , NameInfo (..)
-  , HasNameInfo (..)
-  -- * Options
-  , SocketOption (..)
-  -- ** Error
-  , Error (..)
-  -- ** ReuseAddress
-  , ReuseAddress (..)
-  -- ** KeepAlive
-  , KeepAlive (..)
-  -- * Flags
-  -- ** MessageFlags
-  , MessageFlags (..)
-  , msgNoSignal
-  , msgEndOfRecord
-  , msgOutOfBand
-  , msgWaitAll
-  , msgPeek
-  -- ** AddressInfoFlags
-  , AddressInfoFlags ()
-  , aiAddressConfig
-  , aiAll
-  , aiCanonicalName
-  , aiNumericHost
-  , aiNumericService
-  , aiPassive
-  , aiV4Mapped
-  -- ** NameInfoFlags
-  , NameInfoFlags ()
-  , niNameRequired
-  , niDatagram
-  , niNoFullyQualifiedDomainName
-  , niNumericHost
-  , niNumericService
-  -- * Exceptions
-  -- ** SocketException
-  , module System.Socket.Internal.Exception
-  -- ** AddressInfoException
-  , AddressInfoException (..)
-  , eaiAgain
-  , eaiBadFlags
-  , eaiFail
-  , eaiFamily
-  , eaiMemory
-  , eaiNoName
-  , eaiSocketType
-  , eaiService
-  , eaiSystem
-  ) where
+  Socket (),
+  SocketAddress (),
 
+  -- ** Family
+  Family (..),
+
+  -- ** Type
+  Type (..),
+
+  -- ** Protocol
+  Protocol (..),
+
+  -- * Operations
+
+  -- ** socket
+  socket,
+
+  -- ** connect
+  connect,
+
+  -- ** bind
+  bind,
+
+  -- ** listen
+  listen,
+
+  -- ** accept
+  accept,
+
+  -- ** send, sendTo
+  send,
+  sendTo,
+
+  -- ** receive, receiveFrom
+  receive,
+  receiveFrom,
+
+  -- ** close
+  close,
+
+  -- * Name Resolution
+
+  -- ** getAddress
+  getAddress,
+
+  -- ** getAddressInfo
+  AddressInfo (..),
+  HasAddressInfo (..),
+
+  -- ** getNameInfo
+  NameInfo (..),
+  HasNameInfo (..),
+
+  -- * Options
+  SocketOption (..),
+
+  -- ** Error
+  Error (..),
+
+  -- ** ReuseAddress
+  ReuseAddress (..),
+
+  -- ** KeepAlive
+  KeepAlive (..),
+
+  -- * Flags
+
+  -- ** MessageFlags
+  MessageFlags (..),
+  msgNoSignal,
+  msgEndOfRecord,
+  msgOutOfBand,
+  msgWaitAll,
+  msgPeek,
+
+  -- ** AddressInfoFlags
+  AddressInfoFlags (),
+  aiAddressConfig,
+  aiAll,
+  aiCanonicalName,
+  aiNumericHost,
+  aiNumericService,
+  aiPassive,
+  aiV4Mapped,
+
+  -- ** NameInfoFlags
+  NameInfoFlags (),
+  niNameRequired,
+  niDatagram,
+  niNoFullyQualifiedDomainName,
+  niNumericHost,
+  niNumericService,
+
+  -- * Exceptions
+
+  -- ** SocketException
+  module System.Socket.Internal.Exception,
+
+  -- ** AddressInfoException
+  AddressInfoException (..),
+  eaiAgain,
+  eaiBadFlags,
+  eaiFail,
+  eaiFamily,
+  eaiMemory,
+  eaiNoName,
+  eaiSocketType,
+  eaiService,
+  eaiSystem,
+) where
+
+import Control.Concurrent
 import Control.Exception
 import Control.Monad
-import Control.Concurrent
-
-import Data.Function
 import qualified Data.ByteString as BS
-import qualified Data.ByteString.Unsafe as BS
 import qualified Data.ByteString.Internal as BS
-
-import GHC.Conc ( closeFdWith )
-
-import Foreign.Storable
+import qualified Data.ByteString.Unsafe as BS
+import Data.Function
 import Foreign.Marshal.Alloc
-
-import System.Socket.Unsafe
-
-import System.Socket.Internal.Socket
-import System.Socket.Internal.SocketOption
+import Foreign.Storable
+import GHC.Conc (closeFdWith)
+import System.Socket.Internal.AddressInfo
 import System.Socket.Internal.Exception
 import System.Socket.Internal.Message
-import System.Socket.Internal.AddressInfo
 import System.Socket.Internal.Platform
+import System.Socket.Internal.Socket
+import System.Socket.Internal.SocketOption
+import System.Socket.Unsafe
 
 -- | Creates a new socket.
 --
@@ -187,25 +216,30 @@ import System.Socket.Internal.Platform
 --       leaking file descriptors.
 --     - This operation throws `SocketException`s. Consult your @man socket@ for
 --       details and specific errors.
-socket :: (Family f, Type t, Protocol  p) => IO (Socket f t p)
+socket :: (Family f, Type t, Protocol p) => IO (Socket f t p)
 socket = socket'
  where
-   socket' :: forall f t p. (Family f, Type t, Protocol  p) => IO (Socket f t p)
-   socket'  = alloca $ \errPtr-> do
-     bracketOnError
-       -- Try to acquire the socket resource. This part has exceptions masked.
-       ( c_socket (familyNumber (undefined :: f)) (typeNumber (undefined :: t)) (protocolNumber (undefined :: p)) errPtr )
-       -- On failure after the c_socket call we try to close the socket to not leak file descriptors.
-       -- If closing fails we cannot really do something about it. We tried at least.
-       -- c_close is an unsafe FFI call.
-       ( \fd-> when (fd >= 0) $ alloca $ void . c_close fd )
-       ( \fd-> do
-           when (fd < 0) (SocketException <$> peek errPtr >>= throwIO)
-           mfd <- newMVar fd
-           let s = Socket mfd
-           _ <- mkWeakMVar mfd (close s)
-           return s
-       )
+  socket' :: forall f t p. (Family f, Type t, Protocol p) => IO (Socket f t p)
+  socket' = alloca $ \errPtr -> do
+    bracketOnError
+      -- Try to acquire the socket resource. This part has exceptions masked.
+      ( c_socket
+          (familyNumber (undefined :: f))
+          (typeNumber (undefined :: t))
+          (protocolNumber (undefined :: p))
+          errPtr
+      )
+      -- On failure after the c_socket call we try to close the socket to not leak file descriptors.
+      -- If closing fails we cannot really do something about it. We tried at least.
+      -- c_close is an unsafe FFI call.
+      (\fd -> when (fd >= 0) $ alloca $ void . c_close fd)
+      ( \fd -> do
+          when (fd < 0) (SocketException <$> peek errPtr >>= throwIO)
+          mfd <- newMVar fd
+          let s = Socket mfd
+          _ <- mkWeakMVar mfd (close s)
+          return s
+      )
 
 -- | Connects to a remote address.
 --
@@ -217,11 +251,11 @@ socket = socket'
 --     been reassigned.
 connect :: (Family f) => Socket f t p -> SocketAddress f -> IO ()
 connect s@(Socket mfd) addr =
-  alloca $ \addrPtr-> alloca $ \errPtr-> do
+  alloca $ \addrPtr -> alloca $ \errPtr -> do
     poke addrPtr addr
     let addrLen = fromIntegral (sizeOf addr)
     -- The actual connection attempt.
-    i <- withMVar mfd $ \fd-> do
+    i <- withMVar mfd $ \fd -> do
       when (fd < 0) (throwIO eBadFileDescriptor)
       c_connect fd addrPtr addrLen errPtr
     -- On non-blocking sockets we expect to get EINPROGRESS or EWOULDBLOCK.
@@ -238,7 +272,7 @@ connect s@(Socket mfd) addr =
           -- At least on Linux a second connect after signaled writeability
           -- will not fail in case the connection has been established
           -- sucessfully (the next one would).
-          i' <- withMVar mfd $ \fd-> do
+          i' <- withMVar mfd $ \fd -> do
             when (fd < 0) (throwIO eBadFileDescriptor)
             c_connect fd addrPtr addrLen errPtr
           when (i' /= 0) $ do
@@ -260,9 +294,9 @@ connect s@(Socket mfd) addr =
 --     details and specific @errno@s.
 bind :: (Family f) => Socket f t p -> SocketAddress f -> IO ()
 bind (Socket mfd) addr =
-  alloca $ \addrPtr-> alloca $ \errPtr-> do
+  alloca $ \addrPtr -> alloca $ \errPtr -> do
     poke addrPtr addr
-    withMVar mfd $ \fd-> do
+    withMVar mfd $ \fd -> do
       i <- c_bind fd addrPtr (fromIntegral $ sizeOf addr) errPtr
       when (i /= 0) (SocketException <$> peek errPtr >>= throwIO)
 
@@ -278,7 +312,7 @@ bind (Socket mfd) addr =
 --     details and specific errors.
 listen :: Socket f t p -> Int -> IO ()
 listen (Socket ms) backlog =
-  withMVar ms $ \s-> alloca $ \errPtr-> do
+  withMVar ms $ \s -> alloca $ \errPtr -> do
     i <- c_listen s (fromIntegral backlog) errPtr
     when (i /= 0) (SocketException <$> peek errPtr >>= throwIO)
 
@@ -299,38 +333,40 @@ listen (Socket ms) backlog =
 --     internally and retries automatically.
 accept :: (Family f) => Socket f t p -> IO (Socket f t p, SocketAddress f)
 accept s@(Socket mfd) = accept'
-  where
-    accept' :: forall f t p. (Family f) => IO (Socket f t p, SocketAddress f)
-    accept' = do
-      -- Allocate local (!) memory for the address.
-      alloca $ \addrPtr-> alloca $ \addrPtrLen-> alloca $ \errPtr-> do
-        poke addrPtrLen (fromIntegral $ sizeOf (undefined :: SocketAddress f))
-        ( fix $ \again iteration-> do
-            msa <- withMVar mfd $ \fd-> do
-              when (fd < 0) (throwIO eBadFileDescriptor)
-              bracketOnError
-                ( c_accept fd addrPtr addrPtrLen errPtr )
-                ( \ft-> when (ft >= 0) $ alloca $ void . c_close ft )
-                ( \ft-> if ft < 0
-                  then do
-                    err <- SocketException <$> peek errPtr
-                    -- EWOULDBLOCK and EAGAIN are valid in case there a no
-                    -- queued connections at the moment and we are supposed to
-                    -- wait. All other errors are unexpected and we throw them.
-                    unless (err == eWouldBlock || err == eAgain) (throwIO err)
-                    return Nothing
-                  else do
-                    addr <- peek addrPtr :: IO (SocketAddress f)
-                    s'@(Socket mft) <- Socket <$> newMVar ft
-                    -- Register a finalizer on the new socket.
-                    _ <- mkWeakMVar mft (close s')
-                    return $ Just (s', addr)
-                )
-            -- If ews is Left we got EAGAIN or EWOULDBLOCK and retry after the next event.
-            case msa of
-              Just sa -> return sa
-              Nothing -> waitRead s iteration >> (again $! iteration + 1)
-          ) 0 -- This is the initial iteration value.
+ where
+  accept' :: forall f t p. (Family f) => IO (Socket f t p, SocketAddress f)
+  accept' = do
+    -- Allocate local (!) memory for the address.
+    alloca $ \addrPtr -> alloca $ \addrPtrLen -> alloca $ \errPtr -> do
+      poke addrPtrLen (fromIntegral $ sizeOf (undefined :: SocketAddress f))
+      ( fix $ \again iteration -> do
+          msa <- withMVar mfd $ \fd -> do
+            when (fd < 0) (throwIO eBadFileDescriptor)
+            bracketOnError
+              (c_accept fd addrPtr addrPtrLen errPtr)
+              (\ft -> when (ft >= 0) $ alloca $ void . c_close ft)
+              ( \ft ->
+                  if ft < 0
+                    then do
+                      err <- SocketException <$> peek errPtr
+                      -- EWOULDBLOCK and EAGAIN are valid in case there a no
+                      -- queued connections at the moment and we are supposed to
+                      -- wait. All other errors are unexpected and we throw them.
+                      unless (err == eWouldBlock || err == eAgain) (throwIO err)
+                      return Nothing
+                    else do
+                      addr <- peek addrPtr :: IO (SocketAddress f)
+                      s'@(Socket mft) <- Socket <$> newMVar ft
+                      -- Register a finalizer on the new socket.
+                      _ <- mkWeakMVar mft (close s')
+                      return $ Just (s', addr)
+              )
+          -- If ews is Left we got EAGAIN or EWOULDBLOCK and retry after the next event.
+          case msa of
+            Just sa -> return sa
+            Nothing -> waitRead s iteration >> (again $! iteration + 1)
+        )
+        0 -- This is the initial iteration value.
 
 -- | Send data.
 --
@@ -347,17 +383,25 @@ accept s@(Socket mfd) = accept'
 --     on the socket and then waits when it got `eAgain` or `eWouldBlock`.
 send :: Socket f t p -> BS.ByteString -> MessageFlags -> IO Int
 send s bs flags = do
-  bytesSent <- BS.unsafeUseAsCStringLen bs $ \(bufPtr,bufSize)->
+  bytesSent <- BS.unsafeUseAsCStringLen bs $ \(bufPtr, bufSize) ->
     unsafeSend s bufPtr (fromIntegral bufSize) flags
   return (fromIntegral bytesSent)
 
 -- | Like `send`, but allows to specify a destination address.
-sendTo ::(Family f) => Socket f t p -> BS.ByteString -> MessageFlags -> SocketAddress f -> IO Int
+sendTo
+  :: (Family f)
+  => Socket f t p -> BS.ByteString -> MessageFlags -> SocketAddress f -> IO Int
 sendTo s bs flags addr = do
-  bytesSent <- alloca $ \addrPtr-> do
+  bytesSent <- alloca $ \addrPtr -> do
     poke addrPtr addr
-    BS.unsafeUseAsCStringLen bs $ \(bufPtr,bufSize)->
-      unsafeSendTo s bufPtr (fromIntegral bufSize) flags addrPtr (fromIntegral $ sizeOf addr)
+    BS.unsafeUseAsCStringLen bs $ \(bufPtr, bufSize) ->
+      unsafeSendTo
+        s
+        bufPtr
+        (fromIntegral bufSize)
+        flags
+        addrPtr
+        (fromIntegral $ sizeOf addr)
   return (fromIntegral bytesSent)
 
 -- | Receive data.
@@ -377,22 +421,28 @@ sendTo s bs flags addr = do
 --     the socket is signaled to be readable.
 receive :: Socket f t p -> Int -> MessageFlags -> IO BS.ByteString
 receive s bufSize flags =
-  BS.createUptoN bufSize $ \bufPtr->
+  BS.createUptoN bufSize $ \bufPtr ->
     fromIntegral `fmap` unsafeReceive s bufPtr (fromIntegral bufSize) flags
 
 -- | Like `receive`, but additionally yields the peer address.
-receiveFrom :: (Family f) => Socket f t p -> Int -> MessageFlags -> IO (BS.ByteString, SocketAddress f)
+receiveFrom
+  :: (Family f)
+  => Socket f t p -> Int -> MessageFlags -> IO (BS.ByteString, SocketAddress f)
 receiveFrom = receiveFrom'
-  where
-    receiveFrom' :: forall f t p. (Family f) => Socket f t p -> Int -> MessageFlags -> IO (BS.ByteString, SocketAddress f)
-    receiveFrom' s bufSize flags = do
-      alloca $ \addrPtr-> do
-        alloca $ \addrSizePtr-> do
-          poke addrSizePtr (fromIntegral $ sizeOf (undefined :: SocketAddress f))
-          bs <- BS.createUptoN bufSize $ \bufPtr->
-            fromIntegral `fmap` unsafeReceiveFrom s bufPtr (fromIntegral bufSize) flags addrPtr addrSizePtr
-          addr <- peek addrPtr
-          return (bs, addr)
+ where
+  receiveFrom'
+    :: forall f t p
+     . (Family f)
+    => Socket f t p -> Int -> MessageFlags -> IO (BS.ByteString, SocketAddress f)
+  receiveFrom' s bufSize flags = do
+    alloca $ \addrPtr -> do
+      alloca $ \addrSizePtr -> do
+        poke addrSizePtr (fromIntegral $ sizeOf (undefined :: SocketAddress f))
+        bs <- BS.createUptoN bufSize $ \bufPtr ->
+          fromIntegral
+            `fmap` unsafeReceiveFrom s bufPtr (fromIntegral bufSize) flags addrPtr addrSizePtr
+        addr <- peek addrPtr
+        return (bs, addr)
 
 -- | Closes a socket.
 --
@@ -409,28 +459,30 @@ receiveFrom = receiveFrom'
 --     documented). `eInterrupted` is catched internally and retried automatically, so won't be thrown.
 close :: Socket f t p -> IO ()
 close (Socket mfd) = do
-  modifyMVarMasked_ mfd $ \fd-> do
-    if fd < 0 then do
-      return fd
-    else do
-      -- closeFdWith does not throw even on invalid file descriptors.
-      -- It just assures no thread is blocking on the fd anymore and then executes the IO action.
-      closeFdWith
-        -- The c_close operation may (according to Posix documentation) fails with EINTR or EBADF or EIO.
-        -- EBADF: Should be ruled out by the library's design.
-        -- EINTR: It is best practice to just retry the operation what we do here.
-        -- EIO: Only occurs when filesystem is involved (?).
-        -- Conclusion: Our close should never fail. If it does, something is horribly wrong.
-        ( const $ alloca $ \errPtr-> fix $ \retry-> do
-            i <- c_close fd errPtr
-            when (i /= 0) $ do
-              err <- SocketException <$> peek errPtr
-              when (err /= eInterrupted) (throwIO err)
-              retry
-        ) fd
-      -- When we arrive here, no exception has been thrown and the descriptor has been closed.
-      -- We put an invalid file descriptor into the MVar.
-      return (-1)
+  modifyMVarMasked_ mfd $ \fd -> do
+    if fd < 0
+      then do
+        return fd
+      else do
+        -- closeFdWith does not throw even on invalid file descriptors.
+        -- It just assures no thread is blocking on the fd anymore and then executes the IO action.
+        closeFdWith
+          -- The c_close operation may (according to Posix documentation) fails with EINTR or EBADF or EIO.
+          -- EBADF: Should be ruled out by the library's design.
+          -- EINTR: It is best practice to just retry the operation what we do here.
+          -- EIO: Only occurs when filesystem is involved (?).
+          -- Conclusion: Our close should never fail. If it does, something is horribly wrong.
+          ( const $ alloca $ \errPtr -> fix $ \retry -> do
+              i <- c_close fd errPtr
+              when (i /= 0) $ do
+                err <- SocketException <$> peek errPtr
+                when (err /= eInterrupted) (throwIO err)
+                retry
+          )
+          fd
+        -- When we arrive here, no exception has been thrown and the descriptor has been closed.
+        -- We put an invalid file descriptor into the MVar.
+        return (-1)
 
 -- | Get a socket's (local) address.
 --
@@ -444,12 +496,12 @@ close (Socket mfd) = do
 --     is undefined.
 getAddress :: (Family f) => Socket f t p -> IO (SocketAddress f)
 getAddress = getAddress'
-  where
-    getAddress' :: forall f t p. (Family f) => Socket f t p -> IO (SocketAddress f)
-    getAddress' (Socket mfd) = alloca $ \addrPtr -> alloca $ \addrSizePtr -> alloca $ \errPtr -> do
-      poke addrSizePtr (fromIntegral $ sizeOf (undefined :: SocketAddress f))
-      withMVar mfd $ \fd -> do
-        i <- c_getsockname fd addrPtr addrSizePtr errPtr
-        when (i /= 0) (SocketException <$> peek errPtr >>= throwIO)
-        addr <- peek addrPtr
-        return addr
+ where
+  getAddress' :: forall f t p. (Family f) => Socket f t p -> IO (SocketAddress f)
+  getAddress' (Socket mfd) = alloca $ \addrPtr -> alloca $ \addrSizePtr -> alloca $ \errPtr -> do
+    poke addrSizePtr (fromIntegral $ sizeOf (undefined :: SocketAddress f))
+    withMVar mfd $ \fd -> do
+      i <- c_getsockname fd addrPtr addrSizePtr errPtr
+      when (i /= 0) (SocketException <$> peek errPtr >>= throwIO)
+      addr <- peek addrPtr
+      return addr

@@ -1,4 +1,7 @@
 --------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+
 -- |
 -- Module      :  System.Socket.Protocol.Default
 -- Copyright   :  (c) Lars Petersen 2015
@@ -6,7 +9,6 @@
 --
 -- Maintainer  :  info@lars-petersen.net
 -- Stability   :  experimental
---------------------------------------------------------------------------------
 module System.Socket.Protocol.Default where
 
 import System.Socket.Internal.Socket
