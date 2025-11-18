@@ -1,10 +1,3 @@
-{-# LANGUAGE DeriveDataTypeable #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-
---------------------------------------------------------------------------------
-
---------------------------------------------------------------------------------
-
 -- |
 -- Module      :  System.Socket.Internal.Exception
 -- Copyright   :  (c) Lars Petersen 2015
@@ -53,7 +46,6 @@ module System.Socket.Internal.Exception (
 ) where
 
 import Control.Exception
-import Data.Typeable
 import Foreign.C.Types
 import System.Socket.Internal.Constants
 
@@ -66,7 +58,7 @@ import System.Socket.Internal.Constants
 --   >    | otherwise -> ...
 newtype SocketException
   = SocketException CInt
-  deriving (Typeable, Eq, Ord)
+  deriving (Eq, Ord)
 
 instance Exception SocketException
 

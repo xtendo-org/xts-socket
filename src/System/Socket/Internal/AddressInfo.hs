@@ -1,13 +1,8 @@
-{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeFamilies #-}
-
---------------------------------------------------------------------------------
-
---------------------------------------------------------------------------------
 
 -- |
 -- Module      :  System.Socket.Internal.AddressInfo
@@ -53,7 +48,6 @@ import Data.Bits
 import qualified Data.ByteString as BS
 import Data.Monoid
 import Data.Semigroup as Sem
-import Data.Typeable
 import Foreign.C.Types
 import Foreign.Marshal.Alloc
 import Foreign.Ptr
@@ -88,7 +82,7 @@ deriving instance (Show (SocketAddress f)) => Show (AddressInfo f t p)
 --   >    | otherwise -> ...
 newtype AddressInfoException
   = AddressInfoException CInt
-  deriving (Eq, Typeable)
+  deriving (Eq)
 
 instance Show AddressInfoException where
   show e
@@ -327,7 +321,7 @@ getAddressInfo' mnode mservice (AddressInfoFlags flags) = do
             then return Nothing
             else BS.packCString cnPtr >>= return . Just
         as <- peek (ai_next ptr) >>= peekAddressInfos
-        return ((AddressInfo (AddressInfoFlags flag) addr cname) : as)
+        return (AddressInfo (AddressInfoFlags flag) addr cname : as)
 
 -- | A `NameInfo` consists of host and service name.
 data NameInfo
