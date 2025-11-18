@@ -1,20 +1,20 @@
-name:                socket
+name:                xts-socket
 version:             0.8.3.0
 synopsis:            An extensible socket library.
 description:
   This library is a minimal cross-platform interface for
-  BSD style networking.
+  BSD style networking. (Fork of @socket@)
 
 license:             MIT
 license-file:        LICENSE
-author:              Lars Petersen
-maintainer:          info@lars-petersen.net
+author:              Lars Petersen, XT
+maintainer:          git@xtendo.org
 category:            System, Network
 build-type:          Simple
 cabal-version:       >=1.10
-homepage:            https://github.com/lpeterse/haskell-socket
-bug-reports:         https://github.com/lpeterse/haskell-socket/issues
-tested-with:         GHC==8.0.2, GHC==8.2.2, GHC==8.4.3, GHC==8.8.3
+homepage:            https://github.com/xtendo-org/xts-socket
+bug-reports:         https://github.com/xtendo-org/xts-socket/issues
+tested-with:         GHC==9.8.4, GHC==9.10.3, GHC==9.12.2
 extra-source-files:  README.md
                      CHANGELOG.md
                      CONTRIBUTORS.txt
@@ -102,4 +102,4 @@ test-suite threaded
 
 source-repository head
   type:     git
-  location: git://github.com/lpeterse/haskell-socket.git
+  location: git://github.com/xtendo-org/xts-socket.git
