@@ -12,7 +12,6 @@ on:
 jobs:
   stack-test:
     name: ${{ matrix.name }}
-    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.mergeable_state == 'clean' }}
     strategy:
       fail-fast: false
       matrix:
@@ -43,7 +42,7 @@ jobs:
             workdir: .stack-work-lts24
     runs-on: ${{ matrix.os }}
     env:
-      STACK_ROOT: ${{ env.HOME }}/.stack
+      STACK_ROOT: ${{ github.workspace }}/.stack-root
       STACK_RESOLVER: ${{ matrix.resolver }}
       STACK_WORK_DIR: ${{ matrix.workdir }}
     steps:
@@ -51,12 +50,14 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          repository: ${{ github.repository }}
+          ref: ${{ github.event_name == 'pull_request' && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
 
       - name: Cache Stack root and work dir
         uses: actions/cache@v4
         with:
           path: |
-            ${{ env.HOME }}/.stack
+            ${{ github.workspace }}/.stack-root
             ${{ matrix.workdir }}
           key: ${{ runner.os }}-stack-${{ matrix.resolver }}-${{ hashFiles('stack.yaml.lock') }}-${{ matrix.workdir }}
           restore-keys: |
