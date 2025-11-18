@@ -169,3 +169,10 @@ void hs_freeaddrinfo(struct addrinfo *res);
 #define SEPROTOTYPE            WSAEPROTOTYPE
 #define SEMSGSIZE              WSAEMSGSIZE
 #define SEDESTADDRREQ          WSAEDESTADDRREQ
+
+// These four constants are always zero on Windows;
+// See <https://github.com/xtendo-org/xts-socket/pull/2>
+#define HS_HAS_SOCKADDR_IN_LEN              0
+#define HS_HAS_SOCKADDR_IN6_LEN             0
+#define HS_OFFSETOF_SOCKADDR_IN_SIN_LEN     0
+#define HS_OFFSETOF_SOCKADDR_IN6_SIN6_LEN   0
