@@ -21,7 +21,7 @@ module System.Socket.Internal.Message (
 ) where
 
 import Data.Bits
-import Data.List (intersperse)
+import Data.List (intercalate)
 import Data.Maybe
 import Data.Monoid
 import Data.Semigroup as Sem
@@ -66,7 +66,7 @@ instance Show MessageFlags where
               then Just ("MessageFlags " ++ show i)
               else Nothing
       ]
-    y = concat $ intersperse "," $ catMaybes x
+    y = intercalate "," (catMaybes x)
 
 -- | @MSG_NOSIGNAL@
 --

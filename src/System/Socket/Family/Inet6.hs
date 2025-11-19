@@ -426,17 +426,17 @@ w64_2 x = fromIntegral $ rem (quot x $ 256 * 256 * 256 * 256 * 256) 256
 w64_3 x = fromIntegral $ rem (quot x $ 256 * 256 * 256 * 256) 256
 w64_4 x = fromIntegral $ rem (quot x $ 256 * 256 * 256) 256
 w64_5 x = fromIntegral $ rem (quot x $ 256 * 256) 256
-w64_6 x = fromIntegral $ rem (quot x $ 256) 256
+w64_6 x = fromIntegral $ rem (quot x 256) 256
 w64_7 x = fromIntegral $ rem x 256
 
 w32_0, w32_1, w32_2, w32_3 :: Word32 -> Word8
 w32_0 x = fromIntegral $ rem (quot x $ 256 * 256 * 256) 256
 w32_1 x = fromIntegral $ rem (quot x $ 256 * 256) 256
-w32_2 x = fromIntegral $ rem (quot x $ 256) 256
+w32_2 x = fromIntegral $ rem (quot x 256) 256
 w32_3 x = fromIntegral $ rem x 256
 
 w16_0, w16_1 :: Word16 -> Word8
-w16_0 x = fromIntegral $ rem (quot x $ 256) 256
+w16_0 x = fromIntegral $ rem (quot x 256) 256
 w16_1 x = fromIntegral $ rem x 256
 
 sockaddrIn6Size :: Int
@@ -490,12 +490,12 @@ pokeSaFamily ptr val =
   case saFamily6Size of
     1 ->
       pokeByteOff
-        (castPtr ptr)
+        ptr
         sockaddrIn6Sin6FamilyOffset
         (fromIntegral val :: Word8)
     2 ->
       pokeByteOff
-        (castPtr ptr)
+        ptr
         sockaddrIn6Sin6FamilyOffset
         val
     _ -> error "Unsupported sa_family_t size for Inet6 sockets"

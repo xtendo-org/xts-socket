@@ -234,7 +234,7 @@ socket = socket'
       -- c_close is an unsafe FFI call.
       (\fd -> when (fd >= 0) $ alloca $ void . c_close fd)
       ( \fd -> do
-          when (fd < 0) (SocketException <$> peek errPtr >>= throwIO)
+          when (fd < 0) (peek errPtr >>= throwIO . SocketException)
           mfd <- newMVar fd
           let s = Socket mfd
           _ <- mkWeakMVar mfd (close s)
@@ -298,7 +298,7 @@ bind (Socket mfd) addr =
     poke addrPtr addr
     withMVar mfd $ \fd -> do
       i <- c_bind fd addrPtr (fromIntegral $ sizeOf addr) errPtr
-      when (i /= 0) (SocketException <$> peek errPtr >>= throwIO)
+      when (i /= 0) (peek errPtr >>= throwIO . SocketException)
 
 -- | Starts listening and queueing connection requests on a connection-mode
 --   socket. The second parameter determines the backlog size.
@@ -314,7 +314,7 @@ listen :: Socket f t p -> Int -> IO ()
 listen (Socket ms) backlog =
   withMVar ms $ \s -> alloca $ \errPtr -> do
     i <- c_listen s (fromIntegral backlog) errPtr
-    when (i /= 0) (SocketException <$> peek errPtr >>= throwIO)
+    when (i /= 0) (peek errPtr >>= throwIO . SocketException)
 
 -- | Accept a new connection.
 --
@@ -502,6 +502,5 @@ getAddress = getAddress'
     poke addrSizePtr (fromIntegral $ sizeOf (undefined :: SocketAddress f))
     withMVar mfd $ \fd -> do
       i <- c_getsockname fd addrPtr addrSizePtr errPtr
-      when (i /= 0) (SocketException <$> peek errPtr >>= throwIO)
-      addr <- peek addrPtr
-      return addr
+      when (i /= 0) (peek errPtr >>= throwIO . SocketException)
+      peek addrPtr

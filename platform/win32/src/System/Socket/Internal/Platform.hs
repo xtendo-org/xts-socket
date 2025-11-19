@@ -79,7 +79,7 @@ waitConnected (Socket mfd) =
         threadDelay $ 1 `shiftL` min iteration 20
         -- Try again.
         loop errPtr $! iteration + 1
-      _ -> SocketException <$> peek errPtr >>= throwIO
+      _ -> peek errPtr >>= (throwIO . SocketException)
 
 type CSSize =
   CInt

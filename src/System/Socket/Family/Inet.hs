@@ -121,12 +121,12 @@ inetAddressToTuple (InetAddress a) =
  where
   w0 = fromIntegral $ rem (quot a $ 256 * 256 * 256) 256
   w1 = fromIntegral $ rem (quot a $ 256 * 256) 256
-  w2 = fromIntegral $ rem (quot a $ 256) 256
-  w3 = fromIntegral $ rem a $ 256
+  w2 = fromIntegral $ rem (quot a 256) 256
+  w3 = fromIntegral $ rem a 256
 
 -- | @0.0.0.0@
 inetAny :: InetAddress
-inetAny = InetAddress $ 0
+inetAny = InetAddress 0
 
 -- | @255.255.255.255@
 inetBroadcast :: InetAddress
@@ -155,9 +155,8 @@ inetMaxLocalGroup = InetAddress $ foldl1' (\x y -> x * 256 + y) [224, 0, 0, 255]
 instance Show InetAddress where
   show (InetAddress a) =
     ("InetAddress " ++) $
-      concat $
-        intersperse "." $
-          map (\p -> show $ a `div` 256 ^ p `mod` 256) [3, 2, 1, 0 :: Word32]
+      intercalate "." $
+        map (\p -> show $ a `div` 256 ^ p `mod` 256) [3, 2, 1, 0 :: Word32]
 
 instance Storable InetPort where
   sizeOf _ = sizeOf (undefined :: Word16)
@@ -214,12 +213,12 @@ pokeSaFamily ptr val =
   case saFamilySize of
     1 ->
       pokeByteOff
-        (castPtr ptr)
+        ptr
         sockaddrInSinFamilyOffset
         (fromIntegral val :: Word8)
     2 ->
       pokeByteOff
-        (castPtr ptr)
+        ptr
         sockaddrInSinFamilyOffset
         val
     _ -> error "Unsupported sa_family_t size for Inet sockets"
@@ -238,8 +237,8 @@ instance Storable InetAddress where
   poke ptr (InetAddress a) = do
     pokeByteOff ptr 0 (fromIntegral $ rem (quot a $ 256 * 256 * 256) 256 :: Word8)
     pokeByteOff ptr 1 (fromIntegral $ rem (quot a $ 256 * 256) 256 :: Word8)
-    pokeByteOff ptr 2 (fromIntegral $ rem (quot a $ 256) 256 :: Word8)
-    pokeByteOff ptr 3 (fromIntegral $ rem a $ 256 :: Word8)
+    pokeByteOff ptr 2 (fromIntegral $ rem (quot a 256) 256 :: Word8)
+    pokeByteOff ptr 3 (fromIntegral $ rem a 256 :: Word8)
 
 instance Storable (SocketAddress Inet) where
   sizeOf _ = sockaddrInSize

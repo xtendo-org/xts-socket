@@ -1,6 +1,4 @@
---------------------------------------------------------------------------------
-
---------------------------------------------------------------------------------
+{-# LANGUAGE ScopedTypeVariables #-}
 
 -- |
 -- Module      :  System.Socket.Internal.SocketOption
@@ -114,14 +112,17 @@ unsafeSetSocketOption (Socket mfd) level name value =
   withMVar mfd $ \fd -> alloca $ \vPtr -> alloca $ \errPtr -> do
     poke vPtr value
     i <- c_setsockopt fd level name vPtr (fromIntegral $ sizeOf value) errPtr
-    when (i < 0) (SocketException <$> peek errPtr >>= throwIO)
+    when (i < 0) (peek errPtr >>= throwIO . SocketException)
 
-unsafeGetSocketOption :: (Storable a) => Socket f t p -> CInt -> CInt -> IO a
+unsafeGetSocketOption
+  :: forall stored fam typ proto
+   . (Storable stored) => Socket fam typ proto -> CInt -> CInt -> IO stored
 unsafeGetSocketOption (Socket mfd) level name =
   withMVar mfd $ \fd -> alloca $ \vPtr -> alloca $ \lPtr -> alloca $ \errPtr -> do
-    u <- return undefined
     poke lPtr (fromIntegral $ sizeOf u)
     i <- c_getsockopt fd level name vPtr (lPtr :: Ptr CInt) errPtr
-    when (i < 0) (SocketException <$> peek errPtr >>= throwIO)
+    when (i < 0) (peek errPtr >>= throwIO . SocketException)
     x <- peek vPtr
     return (x `asTypeOf` u)
+ where
+  u = undefined :: stored
