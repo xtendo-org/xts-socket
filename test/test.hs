@@ -123,7 +123,6 @@ group01 = testGroup "connect" [testGroup "Inet/Stream/TCP" t1]
                 Left e
                   | e == eNetworkUnreachable -> return ()
                   | e == eAddressNotAvailable -> return ()
-                  | e == eAddressFamilyNotSupported -> return ()
                   | otherwise -> reportSocketDebug e (SocketAddressInet inetNone port)
                 Right () -> assertFailure "connection should have failed"
           )
