@@ -69,8 +69,8 @@ jobs:
         with:
           enable-stack: true
           stack-version: 'latest'
-          ghc-version: none
-          cabal-version: none
+          enable-ghc: false
+          enable-cabal: false
 
       - name: Run stack test
         shell: bash
