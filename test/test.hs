@@ -2,23 +2,21 @@
 
 module Main where
 
-import Control.Concurrent (threadDelay)
-import Control.Concurrent.Async (
-  async,
-  cancel,
-  concurrently,
-  poll,
-  race,
-  wait,
- )
-import Control.Exception (bracket, catch, throwIO, try)
-import Control.Monad (unless, void, when)
+import Control.Concurrent
+import Control.Concurrent.Async
+import Control.Exception
+import Control.Monad
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Builder as BB
 import qualified Data.ByteString.Lazy as LBS
-import Data.Int (Int64)
-import Data.Maybe (isJust)
-import Data.Monoid (mappend, mempty)
+import Data.Int
+import Data.List
+import Data.Maybe
+import Data.Monoid
+import Data.Word
+import Foreign.Marshal.Alloc
+import Foreign.Storable
+import Numeric
 import System.Info
 import System.Socket
 import System.Socket.Family.Inet
@@ -31,7 +29,6 @@ import System.Socket.Type.Stream
 import Test.Tasty
 import Test.Tasty.HUnit
 import Test.Tasty.QuickCheck as QC
-import Prelude hiding (head)
 
 main :: IO ()
 main =
@@ -555,8 +552,21 @@ group200 =
     "System.Socket.Family.Inet"
     [ testCase "inetAddressFromTuple (127,0,0,1) == inetLoopback" $
         assertEqual "" (inetAddressFromTuple (127, 0, 0, 1)) inetLoopback
+    , testCase "show inetLoopback literal" $
+        assertEqual "" "InetAddress 127.0.0.1" (show inetLoopback)
     , QC.testProperty "inetAddressToTuple (inetAddressFromTuple x) == x" $ \x ->
         inetAddressToTuple (inetAddressFromTuple x) === x
+    , QC.testProperty "Show InetAddress renders dotted decimal" $
+        \tuple@(w0, w1, w2, w3) ->
+          let expected =
+                "InetAddress " ++ intercalate "." (map show [w0, w1, w2, w3])
+           in show (inetAddressFromTuple tuple) === expected
+    , QC.testProperty "Storable InetAddress round trips" $
+        \tuple -> QC.ioProperty $ alloca $ \ptr -> do
+          let addr = inetAddressFromTuple tuple
+          poke ptr addr
+          result <- peek ptr
+          return (result === addr)
     ]
 
 group201 :: TestTree
@@ -564,7 +574,30 @@ group201 =
   testGroup
     "System.Socket.Family.Inet6"
     [ testCase "inet6AddressFromTuple (0,0,0,0,0,0,0,1) == inet6Loopback" $
-        assertEqual "" (inet6AddressFromTuple (0, 0, 0, 0, 0, 0, 0, 1)) inet6Loopback
-    , QC.testProperty "inet6AddressToTuple (inet6AddressFromTuple x) == x" $ \x ->
-        inet6AddressToTuple (inet6AddressFromTuple x) === x
+        assertEqual
+          ""
+          (inet6AddressFromTuple (0, 0, 0, 0, 0, 0, 0, 1))
+          inet6Loopback
+    , testCase "show inet6Loopback literal" $
+        assertEqual
+          ""
+          "Inet6Address 0000:0000:0000:0000:0000:0000:0000:0001"
+          (show inet6Loopback)
+    , QC.testProperty "inet6AddressToTuple (inet6AddressFromTuple x) == x" $
+        \x -> inet6AddressToTuple (inet6AddressFromTuple x) === x
+    , QC.testProperty "Show Inet6Address renders eight hex groups" $
+        \tuple@(w0, w1, w2, w3, w4, w5, w6, w7) ->
+          let groups = [w0, w1, w2, w3, w4, w5, w6, w7]
+              padHex w =
+                let s = showHex w ""
+                 in replicate (4 - length s) '0' ++ s
+              prefix = "Inet6Address "
+              expected = prefix ++ intercalate ":" (map padHex groups)
+           in show (inet6AddressFromTuple tuple) === expected
+    , QC.testProperty "Storable Inet6Address round trips" $
+        \tuple -> QC.ioProperty $ alloca $ \ptr -> do
+          let addr = inet6AddressFromTuple tuple
+          poke ptr addr
+          result <- peek ptr
+          return (result === addr)
     ]
