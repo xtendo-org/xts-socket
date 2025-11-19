@@ -60,12 +60,15 @@ module System.Socket.Family.Inet6 (
 
 import Control.Applicative as A
 import Control.Monad
-import Data.Bits ((.|.))
+import Data.Bits (unsafeShiftL, unsafeShiftR, (.|.))
+import qualified Data.ByteString.Builder as B
+import qualified Data.ByteString.Lazy.Char8 as L8
 import Data.Word
 import Foreign.C.Types
 import Foreign.Ptr
 import Foreign.Storable
 import System.Socket.Internal.Constants
+import System.Socket.Internal.Endian
 import System.Socket.Internal.Platform
 import System.Socket.Internal.Socket
 import System.Socket.Internal.SocketOption
@@ -124,14 +127,19 @@ newtype Inet6ScopeId = Inet6ScopeId Word32
 inet6AddressToTuple
   :: Inet6Address
   -> (Word16, Word16, Word16, Word16, Word16, Word16, Word16, Word16)
-inet6AddressToTuple (Inet6Address hb lb) =
-  (w0 hb, w1 hb, w2 hb, w3 hb, w0 lb, w1 lb, w2 lb, w3 lb)
+inet6AddressToTuple (Inet6Address rawHb rawLb) =
+  ( fromIntegral (hb `unsafeShiftR` 48)
+  , fromIntegral (hb `unsafeShiftR` 32)
+  , fromIntegral (hb `unsafeShiftR` 16)
+  , fromIntegral hb
+  , fromIntegral (lb `unsafeShiftR` 48)
+  , fromIntegral (lb `unsafeShiftR` 32)
+  , fromIntegral (lb `unsafeShiftR` 16)
+  , fromIntegral lb
+  )
  where
-  w0, w1, w2, w3 :: Word64 -> Word16
-  w0 x = fromIntegral $ rem (quot x $ 65536 * 65536 * 65536) 65536
-  w1 x = fromIntegral $ rem (quot x $ 65536 * 65536) 65536
-  w2 x = fromIntegral $ rem (quot x 65536) 65536
-  w3 x = fromIntegral $ rem x 65536
+  hb = network64 rawHb
+  lb = network64 rawLb
 
 -- | Constructs a custom `Inet6Address`.
 --
@@ -140,245 +148,88 @@ inet6AddressFromTuple
   :: (Word16, Word16, Word16, Word16, Word16, Word16, Word16, Word16)
   -> Inet6Address
 inet6AddressFromTuple (w0, w1, w2, w3, w4, w5, w6, w7) =
-  Inet6Address hb lb
+  Inet6Address (network64 hb) (network64 lb)
  where
-  hb =
-    fromIntegral w0 * 65536 * 65536 * 65536
-      .|. fromIntegral w1 * 65536 * 65536
-      .|. fromIntegral w2 * 65536
-      .|. fromIntegral w3
-  lb =
-    fromIntegral w4 * 65536 * 65536 * 65536
-      .|. fromIntegral w5 * 65536 * 65536
-      .|. fromIntegral w6 * 65536
-      .|. fromIntegral w7
+  pack a b c d =
+    (fromIntegral a `unsafeShiftL` 48)
+      .|. (fromIntegral b `unsafeShiftL` 32)
+      .|. (fromIntegral c `unsafeShiftL` 16)
+      .|. fromIntegral d
+  hb = pack w0 w1 w2 w3
+  lb = pack w4 w5 w6 w7
 
 -- | @::@
 inet6Any :: Inet6Address
-inet6Any = Inet6Address 0 0
+inet6Any = inet6AddressFromTuple (0, 0, 0, 0, 0, 0, 0, 0)
 
 -- | @::1@
 inet6Loopback :: Inet6Address
-inet6Loopback = Inet6Address 0 1
+inet6Loopback = inet6AddressFromTuple (0, 0, 0, 0, 0, 0, 0, 1)
 
 instance Show Inet6Address where
-  show (Inet6Address high low) =
-    "Inet6Address "
-      ++ [ hex $ hn $ w64_0 high
-         , hex $ ln $ w64_0 high
-         , hex $ hn $ w64_1 high
-         , hex $ ln $ w64_1 high
-         , ':'
-         , hex $ hn $ w64_2 high
-         , hex $ ln $ w64_2 high
-         , hex $ hn $ w64_3 high
-         , hex $ ln $ w64_3 high
-         , ':'
-         , hex $ hn $ w64_4 high
-         , hex $ ln $ w64_4 high
-         , hex $ hn $ w64_5 high
-         , hex $ ln $ w64_5 high
-         , ':'
-         , hex $ hn $ w64_6 high
-         , hex $ ln $ w64_6 high
-         , hex $ hn $ w64_7 high
-         , hex $ ln $ w64_7 high
-         , ':'
-         , hex $ hn $ w64_0 low
-         , hex $ ln $ w64_0 low
-         , hex $ hn $ w64_1 low
-         , hex $ ln $ w64_1 low
-         , ':'
-         , hex $ hn $ w64_2 low
-         , hex $ ln $ w64_2 low
-         , hex $ hn $ w64_3 low
-         , hex $ ln $ w64_3 low
-         , ':'
-         , hex $ hn $ w64_4 low
-         , hex $ ln $ w64_4 low
-         , hex $ hn $ w64_5 low
-         , hex $ ln $ w64_5 low
-         , ':'
-         , hex $ hn $ w64_6 low
-         , hex $ ln $ w64_6 low
-         , hex $ hn $ w64_7 low
-         , hex $ ln $ w64_7 low
-         ]
+  showsPrec prec addr =
+    showParen (prec > 10) $
+      showString $
+        L8.unpack $
+          B.toLazyByteString $
+            mconcat
+              [ B.string7 "Inet6Address "
+              , B.word16HexFixed g0
+              , B.char7 ':'
+              , B.word16HexFixed g1
+              , B.char7 ':'
+              , B.word16HexFixed g2
+              , B.char7 ':'
+              , B.word16HexFixed g3
+              , B.char7 ':'
+              , B.word16HexFixed g4
+              , B.char7 ':'
+              , B.word16HexFixed g5
+              , B.char7 ':'
+              , B.word16HexFixed g6
+              , B.char7 ':'
+              , B.word16HexFixed g7
+              ]
    where
-    hn, ln :: Word8 -> Word8
-    hn x = div x 16
-    ln x = mod x 16
-    hex :: Word8 -> Char
-    hex 0 = '0'
-    hex 1 = '1'
-    hex 2 = '2'
-    hex 3 = '3'
-    hex 4 = '4'
-    hex 5 = '5'
-    hex 6 = '6'
-    hex 7 = '7'
-    hex 8 = '8'
-    hex 9 = '9'
-    hex 10 = 'a'
-    hex 11 = 'b'
-    hex 12 = 'c'
-    hex 13 = 'd'
-    hex 14 = 'e'
-    hex 15 = 'f'
-    hex _ = '_'
+    (g0, g1, g2, g3, g4, g5, g6, g7) = inet6AddressToTuple addr
 
 instance Storable Inet6Address where
   sizeOf _ = 16
-  alignment _ = 16
+  alignment _ = alignment (undefined :: Word64)
   peek ptr = do
-    h0 <- peekByteOff ptr 0 :: IO Word8
-    h1 <- peekByteOff ptr 1 :: IO Word8
-    h2 <- peekByteOff ptr 2 :: IO Word8
-    h3 <- peekByteOff ptr 3 :: IO Word8
-    h4 <- peekByteOff ptr 4 :: IO Word8
-    h5 <- peekByteOff ptr 5 :: IO Word8
-    h6 <- peekByteOff ptr 6 :: IO Word8
-    h7 <- peekByteOff ptr 7 :: IO Word8
-    l0 <- peekByteOff ptr 8 :: IO Word8
-    l1 <- peekByteOff ptr 9 :: IO Word8
-    l2 <- peekByteOff ptr 10 :: IO Word8
-    l3 <- peekByteOff ptr 11 :: IO Word8
-    l4 <- peekByteOff ptr 12 :: IO Word8
-    l5 <- peekByteOff ptr 13 :: IO Word8
-    l6 <- peekByteOff ptr 14 :: IO Word8
-    l7 <- peekByteOff ptr 15 :: IO Word8
-    return $
-      Inet6Address
-        ( ( ( ( ( ( ( ( ( ( ( ( ( ( fromIntegral h0
-                                      * 256
-                                  )
-                                    + fromIntegral h1
-                                )
-                                  * 256
-                              )
-                                + fromIntegral h2
-                            )
-                              * 256
-                          )
-                            + fromIntegral h3
-                        )
-                          * 256
-                      )
-                        + fromIntegral h4
-                    )
-                      * 256
-                  )
-                    + fromIntegral h5
-                )
-                  * 256
-              )
-                + fromIntegral h6
-            )
-              * 256
-          )
-            + fromIntegral h7
-        )
-        ( ( ( ( ( ( ( ( ( ( ( ( ( ( fromIntegral l0
-                                      * 256
-                                  )
-                                    + fromIntegral l1
-                                )
-                                  * 256
-                              )
-                                + fromIntegral l2
-                            )
-                              * 256
-                          )
-                            + fromIntegral l3
-                        )
-                          * 256
-                      )
-                        + fromIntegral l4
-                    )
-                      * 256
-                  )
-                    + fromIntegral l5
-                )
-                  * 256
-              )
-                + fromIntegral l6
-            )
-              * 256
-          )
-            + fromIntegral l7
-        )
+    high <- peek (castPtr ptr :: Ptr Word64)
+    low <- peekByteOff ptr 8 :: IO Word64
+    return $ Inet6Address high low
   poke ptr (Inet6Address high low) = do
-    pokeByteOff ptr 0 (w64_0 high)
-    pokeByteOff ptr 1 (w64_1 high)
-    pokeByteOff ptr 2 (w64_2 high)
-    pokeByteOff ptr 3 (w64_3 high)
-    pokeByteOff ptr 4 (w64_4 high)
-    pokeByteOff ptr 5 (w64_5 high)
-    pokeByteOff ptr 6 (w64_6 high)
-    pokeByteOff ptr 7 (w64_7 high)
-    pokeByteOff ptr 8 (w64_0 low)
-    pokeByteOff ptr 9 (w64_1 low)
-    pokeByteOff ptr 10 (w64_2 low)
-    pokeByteOff ptr 11 (w64_3 low)
-    pokeByteOff ptr 12 (w64_4 low)
-    pokeByteOff ptr 13 (w64_5 low)
-    pokeByteOff ptr 14 (w64_6 low)
-    pokeByteOff ptr 15 (w64_7 low)
+    poke (castPtr ptr) high
+    pokeByteOff ptr 8 low
 
 instance Storable Inet6Port where
   sizeOf _ = sizeOf (undefined :: Word16)
   alignment _ = alignment (undefined :: Word16)
   peek ptr = do
-    p0 <- peekByteOff ptr 0 :: IO Word8
-    p1 <- peekByteOff ptr 1 :: IO Word8
-    return $ Inet6Port (fromIntegral p0 * 256 + fromIntegral p1)
-  poke ptr (Inet6Port w16) = do
-    pokeByteOff ptr 0 (w16_0 w16)
-    pokeByteOff ptr 1 (w16_1 w16)
+    w <- peek (castPtr ptr :: Ptr Word16)
+    return $ Inet6Port (network16 w)
+  poke ptr (Inet6Port w16) =
+    poke (castPtr ptr) (network16 w16)
 
 instance Storable Inet6FlowInfo where
   sizeOf _ = sizeOf (undefined :: Word32)
   alignment _ = alignment (undefined :: Word32)
   peek ptr = do
-    p0 <- peekByteOff ptr 0 :: IO Word8
-    p1 <- peekByteOff ptr 1 :: IO Word8
-    p2 <- peekByteOff ptr 2 :: IO Word8
-    p3 <- peekByteOff ptr 3 :: IO Word8
-    return $
-      Inet6FlowInfo $
-        ( ( (((fromIntegral p0 * 256) + fromIntegral p1) * 256)
-              + fromIntegral p2
-          )
-            * 256
-        )
-          + fromIntegral p3
-  poke ptr (Inet6FlowInfo w32) = do
-    pokeByteOff ptr 0 (w32_0 w32)
-    pokeByteOff ptr 1 (w32_1 w32)
-    pokeByteOff ptr 2 (w32_2 w32)
-    pokeByteOff ptr 3 (w32_3 w32)
+    w <- peek (castPtr ptr :: Ptr Word32)
+    return $ Inet6FlowInfo (network32 w)
+  poke ptr (Inet6FlowInfo w32) =
+    poke (castPtr ptr) (network32 w32)
 
 instance Storable Inet6ScopeId where
   sizeOf _ = sizeOf (undefined :: Word32)
   alignment _ = alignment (undefined :: Word32)
   peek ptr = do
-    p0 <- peekByteOff ptr 0 :: IO Word8
-    p1 <- peekByteOff ptr 1 :: IO Word8
-    p2 <- peekByteOff ptr 2 :: IO Word8
-    p3 <- peekByteOff ptr 3 :: IO Word8
-    return $
-      Inet6ScopeId $
-        ( ( (((fromIntegral p0 * 256) + fromIntegral p1) * 256)
-              + fromIntegral p2
-          )
-            * 256
-        )
-          + fromIntegral p3
-  poke ptr (Inet6ScopeId w32) = do
-    pokeByteOff ptr 0 (w32_0 w32)
-    pokeByteOff ptr 1 (w32_1 w32)
-    pokeByteOff ptr 2 (w32_2 w32)
-    pokeByteOff ptr 3 (w32_3 w32)
+    w <- peek (castPtr ptr :: Ptr Word32)
+    return $ Inet6ScopeId (network32 w)
+  poke ptr (Inet6ScopeId w32) =
+    poke (castPtr ptr) (network32 w32)
 
 instance Storable (SocketAddress Inet6) where
   sizeOf _ = sockaddrIn6Size
@@ -418,26 +269,6 @@ instance SocketOption V6Only where
       c_IPPROTO_IPV6
       c_IPV6_V6ONLY
       (if o then 1 else 0 :: CInt)
-
-w64_0, w64_1, w64_2, w64_3, w64_4, w64_5, w64_6, w64_7 :: Word64 -> Word8
-w64_0 x = fromIntegral $ rem (quot x $ 256 * 256 * 256 * 256 * 256 * 256 * 256) 256
-w64_1 x = fromIntegral $ rem (quot x $ 256 * 256 * 256 * 256 * 256 * 256) 256
-w64_2 x = fromIntegral $ rem (quot x $ 256 * 256 * 256 * 256 * 256) 256
-w64_3 x = fromIntegral $ rem (quot x $ 256 * 256 * 256 * 256) 256
-w64_4 x = fromIntegral $ rem (quot x $ 256 * 256 * 256) 256
-w64_5 x = fromIntegral $ rem (quot x $ 256 * 256) 256
-w64_6 x = fromIntegral $ rem (quot x 256) 256
-w64_7 x = fromIntegral $ rem x 256
-
-w32_0, w32_1, w32_2, w32_3 :: Word32 -> Word8
-w32_0 x = fromIntegral $ rem (quot x $ 256 * 256 * 256) 256
-w32_1 x = fromIntegral $ rem (quot x $ 256 * 256) 256
-w32_2 x = fromIntegral $ rem (quot x 256) 256
-w32_3 x = fromIntegral $ rem x 256
-
-w16_0, w16_1 :: Word16 -> Word8
-w16_0 x = fromIntegral $ rem (quot x 256) 256
-w16_1 x = fromIntegral $ rem x 256
 
 sockaddrIn6Size :: Int
 sockaddrIn6Size = fromIntegral c_sizeof_sockaddr_in6
