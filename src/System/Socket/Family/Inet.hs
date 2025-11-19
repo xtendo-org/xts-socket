@@ -56,6 +56,7 @@ module System.Socket.Family.Inet (
   inetUnspecificGroup,
 ) where
 
+import Control.Monad (when)
 import Data.List
 import Data.Word
 import Foreign.Ptr
@@ -187,17 +188,41 @@ sockaddrInSinFamilyOffset = fromIntegral c_offset_sockaddr_in_sin_family
 sockaddrInSinPortOffset = fromIntegral c_offset_sockaddr_in_sin_port
 sockaddrInSinAddrOffset = fromIntegral c_offset_sockaddr_in_sin_addr
 
+sockaddrInHasLen :: Bool
+sockaddrInHasLen = c_has_sockaddr_in_len /= 0
+
+sockaddrInSinLenOffset :: Int
+sockaddrInSinLenOffset = fromIntegral c_offset_sockaddr_in_sin_len
+
 inAddrSAddrOffset :: Int
 inAddrSAddrOffset = fromIntegral c_offset_in_addr_s_addr
-
-sinFamilyPtr :: Ptr (SocketAddress Inet) -> Ptr Word16
-sinFamilyPtr = (`plusPtr` sockaddrInSinFamilyOffset) . castPtr
 
 sinPortPtr :: Ptr (SocketAddress Inet) -> Ptr InetPort
 sinPortPtr = (`plusPtr` sockaddrInSinPortOffset) . castPtr
 
 sinAddrPtr :: Ptr (SocketAddress Inet) -> Ptr InetAddress
 sinAddrPtr = (`plusPtr` (sockaddrInSinAddrOffset + inAddrSAddrOffset)) . castPtr
+
+sinLenPtr :: Ptr (SocketAddress Inet) -> Ptr Word8
+sinLenPtr = (`plusPtr` sockaddrInSinLenOffset) . castPtr
+
+saFamilySize :: Int
+saFamilySize = fromIntegral c_sizeof_sa_family
+
+pokeSaFamily :: Ptr (SocketAddress Inet) -> Word16 -> IO ()
+pokeSaFamily ptr val =
+  case saFamilySize of
+    1 ->
+      pokeByteOff
+        (castPtr ptr)
+        sockaddrInSinFamilyOffset
+        (fromIntegral val :: Word8)
+    2 ->
+      pokeByteOff
+        (castPtr ptr)
+        sockaddrInSinFamilyOffset
+        val
+    _ -> error "Unsupported sa_family_t size for Inet sockets"
 
 instance Storable InetAddress where
   sizeOf _ = sizeOf (undefined :: Word32)
@@ -225,6 +250,8 @@ instance Storable (SocketAddress Inet) where
     return $ SocketAddressInet a p
   poke ptr (SocketAddressInet a p) = do
     c_memset ptr 0 (fromIntegral c_sizeof_sockaddr_in)
-    poke (sinFamilyPtr ptr) (fromIntegral c_AF_INET :: Word16)
+    when sockaddrInHasLen $
+      poke (sinLenPtr ptr) (fromIntegral sockaddrInSize :: Word8)
+    pokeSaFamily ptr (fromIntegral c_AF_INET)
     poke (sinAddrPtr ptr) a
     poke (sinPortPtr ptr) p

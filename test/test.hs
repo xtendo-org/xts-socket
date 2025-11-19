@@ -19,6 +19,7 @@ import qualified Data.ByteString.Lazy as LBS
 import Data.Int (Int64)
 import Data.Maybe (isJust)
 import Data.Monoid (mappend, mempty)
+import System.Info
 import System.Socket
 import System.Socket.Family.Inet
 import System.Socket.Family.Inet6
@@ -117,6 +118,8 @@ group01 = testGroup "connect" [testGroup "Inet/Stream/TCP" t1]
                 Left e
                   | e == eNetworkUnreachable -> return ()
                   | e == eAddressNotAvailable -> return ()
+                  | e == eAddressFamilyNotSupported && os == "darwin" ->
+                      return ()
                   | otherwise -> throwIO e
                 Right () -> assertFailure "connection should have failed"
           )
