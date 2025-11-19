@@ -2,10 +2,6 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE TypeFamilies #-}
 
---------------------------------------------------------------------------------
-
---------------------------------------------------------------------------------
-
 -- |
 -- Module      :  System.Socket.Family.Inet
 -- Copyright   :  (c) Lars Petersen 2015
@@ -57,11 +53,14 @@ module System.Socket.Family.Inet (
 ) where
 
 import Control.Monad (when)
-import Data.List
+import Data.Bits (unsafeShiftL, unsafeShiftR, (.|.))
+import qualified Data.ByteString.Builder as B
+import qualified Data.ByteString.Lazy.Char8 as L8
 import Data.Word
 import Foreign.Ptr
 import Foreign.Storable
 import System.Socket.Internal.Constants
+import System.Socket.Internal.Endian
 import System.Socket.Internal.Platform
 import System.Socket.Internal.Socket
 
@@ -108,70 +107,94 @@ newtype InetPort = InetPort Word16
 -- | Constructs a custom `InetAddress`.
 --
 --   > inetAddressFromTuple (127,0,0,1) == inetLoopback
+{-# INLINE inetAddressFromTuple #-}
 inetAddressFromTuple :: (Word8, Word8, Word8, Word8) -> InetAddress
-inetAddressFromTuple (w0, w1, w2, w3) =
-  InetAddress $ foldl1' (\x y -> x * 256 + y) [f w0, f w1, f w2, f w3]
+inetAddressFromTuple (w0, w1, w2, w3) = InetAddress packed
  where
-  f = fromIntegral
+  packed
+    | isBigEndian =
+        (fromIntegral w0 `unsafeShiftL` 24)
+          .|. (fromIntegral w1 `unsafeShiftL` 16)
+          .|. (fromIntegral w2 `unsafeShiftL` 8)
+          .|. fromIntegral w3
+    | otherwise =
+        (fromIntegral w3 `unsafeShiftL` 24)
+          .|. (fromIntegral w2 `unsafeShiftL` 16)
+          .|. (fromIntegral w1 `unsafeShiftL` 8)
+          .|. fromIntegral w0
 
 -- | Deconstructs an `InetAddress`.
+{-# INLINE inetAddressToTuple #-}
 inetAddressToTuple :: InetAddress -> (Word8, Word8, Word8, Word8)
-inetAddressToTuple (InetAddress a) =
-  (w0, w1, w2, w3)
- where
-  w0 = fromIntegral $ rem (quot a $ 256 * 256 * 256) 256
-  w1 = fromIntegral $ rem (quot a $ 256 * 256) 256
-  w2 = fromIntegral $ rem (quot a 256) 256
-  w3 = fromIntegral $ rem a 256
+inetAddressToTuple (InetAddress packed)
+  | isBigEndian =
+      ( fromIntegral (packed `unsafeShiftR` 24)
+      , fromIntegral (packed `unsafeShiftR` 16)
+      , fromIntegral (packed `unsafeShiftR` 8)
+      , fromIntegral packed
+      )
+  | otherwise =
+      ( fromIntegral packed
+      , fromIntegral (packed `unsafeShiftR` 8)
+      , fromIntegral (packed `unsafeShiftR` 16)
+      , fromIntegral (packed `unsafeShiftR` 24)
+      )
 
 -- | @0.0.0.0@
 inetAny :: InetAddress
-inetAny = InetAddress 0
+inetAny = inetAddressFromTuple (0, 0, 0, 0)
 
 -- | @255.255.255.255@
 inetBroadcast :: InetAddress
-inetBroadcast = InetAddress $ foldl1' (\x y -> x * 256 + y) [255, 255, 255, 255]
+inetBroadcast = inetAddressFromTuple (255, 255, 255, 255)
 
 -- | @255.255.255.255@
 inetNone :: InetAddress
-inetNone = InetAddress $ foldl1' (\x y -> x * 256 + y) [255, 255, 255, 255]
+inetNone = inetAddressFromTuple (255, 255, 255, 255)
 
 -- | @127.0.0.1@
 inetLoopback :: InetAddress
-inetLoopback = InetAddress $ foldl1' (\x y -> x * 256 + y) [127, 0, 0, 1]
+inetLoopback = inetAddressFromTuple (127, 0, 0, 1)
 
 -- | @224.0.0.0@
 inetUnspecificGroup :: InetAddress
-inetUnspecificGroup = InetAddress $ foldl1' (\x y -> x * 256 + y) [224, 0, 0, 0]
+inetUnspecificGroup = inetAddressFromTuple (224, 0, 0, 0)
 
 -- | @224.0.0.1@
 inetAllHostsGroup :: InetAddress
-inetAllHostsGroup = InetAddress $ foldl1' (\x y -> x * 256 + y) [224, 0, 0, 1]
+inetAllHostsGroup = inetAddressFromTuple (224, 0, 0, 1)
 
 -- | @224.0.0.255@
 inetMaxLocalGroup :: InetAddress
-inetMaxLocalGroup = InetAddress $ foldl1' (\x y -> x * 256 + y) [224, 0, 0, 255]
+inetMaxLocalGroup = inetAddressFromTuple (224, 0, 0, 255)
 
 instance Show InetAddress where
-  show (InetAddress a) =
-    ("InetAddress " ++) $
-      intercalate "." $
-        map (\p -> show $ a `div` 256 ^ p `mod` 256) [3, 2, 1, 0 :: Word32]
+  showsPrec prec addr =
+    showParen (prec > 10) $
+      showString $
+        L8.unpack $
+          B.toLazyByteString $
+            mconcat
+              [ B.string7 "InetAddress "
+              , B.word8Dec a0
+              , B.char7 '.'
+              , B.word8Dec a1
+              , B.char7 '.'
+              , B.word8Dec a2
+              , B.char7 '.'
+              , B.word8Dec a3
+              ]
+   where
+    (a0, a1, a2, a3) = inetAddressToTuple addr
 
 instance Storable InetPort where
   sizeOf _ = sizeOf (undefined :: Word16)
   alignment _ = alignment (undefined :: Word16)
   peek ptr = do
-    p0 <- peekByteOff ptr 0 :: IO Word8
-    p1 <- peekByteOff ptr 1 :: IO Word8
-    return $ InetPort (fromIntegral p0 * 256 + fromIntegral p1)
-  poke ptr (InetPort w16) = do
-    pokeByteOff ptr 0 (w16_0 w16)
-    pokeByteOff ptr 1 (w16_1 w16)
-   where
-    w16_0, w16_1 :: Word16 -> Word8
-    w16_0 x = fromIntegral $ rem (quot x 256) 256
-    w16_1 x = fromIntegral $ rem x 256
+    w <- peek (castPtr ptr :: Ptr Word16)
+    return $ InetPort (network16 w)
+  poke ptr (InetPort w16) =
+    poke (castPtr ptr) (network16 w16)
 
 sockaddrInSize :: Int
 sockaddrInSize = fromIntegral c_sizeof_sockaddr_in
@@ -227,18 +250,10 @@ instance Storable InetAddress where
   sizeOf _ = sizeOf (undefined :: Word32)
   alignment _ = alignment (undefined :: Word32)
   peek ptr = do
-    i0 <- peekByteOff ptr 0 :: IO Word8
-    i1 <- peekByteOff ptr 1 :: IO Word8
-    i2 <- peekByteOff ptr 2 :: IO Word8
-    i3 <- peekByteOff ptr 3 :: IO Word8
-    return $ InetAddress $ (((((f i0 * 256) + f i1) * 256) + f i2) * 256) + f i3
-   where
-    f = fromIntegral
-  poke ptr (InetAddress a) = do
-    pokeByteOff ptr 0 (fromIntegral $ rem (quot a $ 256 * 256 * 256) 256 :: Word8)
-    pokeByteOff ptr 1 (fromIntegral $ rem (quot a $ 256 * 256) 256 :: Word8)
-    pokeByteOff ptr 2 (fromIntegral $ rem (quot a 256) 256 :: Word8)
-    pokeByteOff ptr 3 (fromIntegral $ rem a 256 :: Word8)
+    w <- peek (castPtr ptr :: Ptr Word32)
+    return $ InetAddress w
+  poke ptr (InetAddress w) =
+    poke (castPtr ptr) w
 
 instance Storable (SocketAddress Inet) where
   sizeOf _ = sockaddrInSize
