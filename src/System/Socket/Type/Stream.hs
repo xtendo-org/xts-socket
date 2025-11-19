@@ -26,8 +26,8 @@ module System.Socket.Type.Stream (
 
   -- ** Specialized receive operations
 
-  -- *** receiveAll
-  receiveAll,
+  -- *** receiveAllLazy
+  receiveAllLazy,
 ) where
 
 import Control.Exception (throwIO)
@@ -131,19 +131,19 @@ sendAllBuilder s bufsize builder flags = do
     sent <- fromIntegral `fmap` unsafeSend s ptr (fromIntegral len) flags
     when (sent < len) $ sendAllPtr (plusPtr ptr sent) (len - sent)
 
--- | Like `receive`, but operates on lazy `Data.ByteString.Lazy.ByteString`s and
---   continues until either an empty part has been received (peer closed
---   the connection) or given buffer limit has been exceeded or an
---   exception occured.
+-- | Like `receive`, but operates on lazy `Data.ByteString.Lazy.ByteString`s
+-- and continues until either an empty part has been received (peer closed the
+-- connection) or given buffer limit has been exceeded or an exception occured.
 --
---   - The `Data.Int.Int64` parameter is a soft limit on how many bytes to receive.
---     Collection is stopped if the limit has been exceeded. The result might
---     be up to one internal buffer size longer than the given limit.
---     If the returned `Data.ByteString.Lazy.ByteString`s length is lower than or
---     equal to the limit, the data has not been truncated and the
---     transmission is complete.
-receiveAll :: Socket f Stream p -> Int64 -> MessageFlags -> IO LBS.ByteString
-receiveAll sock maxLen flags = collect 0 Data.Monoid.mempty
+-- -  The `Data.Int.Int64` parameter is a soft limit on how many bytes to
+--    receive. Collection is stopped if the limit has been exceeded. The result
+--    might be up to one internal buffer size longer than the given limit. If
+--    the returned `Data.ByteString.Lazy.ByteString`s length is lower than or
+--    equal to the limit, the data has not been truncated and the transmission
+--    is complete.
+receiveAllLazy
+  :: Socket f Stream p -> Int64 -> MessageFlags -> IO LBS.ByteString
+receiveAllLazy sock maxLen flags = collect 0 Data.Monoid.mempty
  where
   collect len accum
     | len > maxLen = do
@@ -158,7 +158,3 @@ receiveAll sock maxLen flags = collect 0 Data.Monoid.mempty
               (accum `Data.Monoid.mappend` BB.byteString bs)
   build accum = do
     return (BB.toLazyByteString accum)
-{-# DEPRECATED
-  receiveAll
-  "Semantics will change in the next major release. Don't use it anymore!"
-  #-}

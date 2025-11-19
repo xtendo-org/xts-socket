@@ -344,10 +344,10 @@ group03 =
 group07 :: TestTree
 group07 =
   testGroup
-    "sendAll/receiveAll"
+    "sendAll/receiveAllLazy"
     [ testGroup
         "Inet/Stream/TCP"
-        [ testCase "sendAll and receiveAll a 128MB chunk" $
+        [ testCase "sendAll and receiveAllLazy a 128MB chunk" $
             bracket
               ( do
                   server <- socket :: IO (Socket Inet Stream TCP)
@@ -367,7 +367,7 @@ group07 =
                   listen server 5
                   serverRecv <- async $ do
                     (peerSock, peerAddr) <- accept server
-                    receiveAll peerSock msgSize mempty
+                    receiveAllLazy peerSock msgSize mempty
                   threadDelay 100000
                   connect client addr
                   sent <- sendAll client (LBS.toStrict msg) mempty
@@ -378,7 +378,7 @@ group07 =
                     (assertFailure "sendAll reported wrong size.")
                   when (msgReceived /= msg) (assertFailure "Received message was bogus.")
               )
-        , testCase "sendAllLazy and receiveAll a 128MB chunk" $
+        , testCase "sendAllLazy and receiveAllLazy a 128MB chunk" $
             bracket
               ( do
                   server <- socket :: IO (Socket Inet Stream TCP)
@@ -398,7 +398,7 @@ group07 =
                   listen server 5
                   serverRecv <- async $ do
                     (peerSock, peerAddr) <- accept server
-                    receiveAll peerSock msgSize mempty
+                    receiveAllLazy peerSock msgSize mempty
                   threadDelay 100000
                   connect client addr
                   sent <- sendAllLazy client msg mempty
@@ -409,7 +409,7 @@ group07 =
                     (assertFailure "sendAllLazy reported wrong size.")
                   when (msgReceived /= msg) (assertFailure "Received message was bogus.")
               )
-        , testCase "sendAllBuilder and receiveAll a 128MB chunk" $
+        , testCase "sendAllBuilder and receiveAllLazy a 128MB chunk" $
             bracket
               ( do
                   server <- socket :: IO (Socket Inet Stream TCP)
@@ -429,7 +429,7 @@ group07 =
                   listen server 5
                   serverRecv <- async $ do
                     (peerSock, peerAddr) <- accept server
-                    receiveAll peerSock msgSize mempty
+                    receiveAllLazy peerSock msgSize mempty
                   threadDelay 100000
                   connect client addr
                   sent <-
