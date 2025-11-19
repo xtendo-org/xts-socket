@@ -60,9 +60,8 @@ jobs:
             ${{ github.workspace }}/.stack-root
             ${{ matrix.workdir }}
             ~/.ghcup
-          key: ${{ runner.os }}-stack-${{ matrix.resolver }}-${{ hashFiles('stack.yaml.lock') }}-${{ matrix.workdir }}
+          key: ${{ runner.os }}-stack-${{ matrix.resolver }}
           restore-keys: |
-            ${{ runner.os }}-stack-${{ matrix.resolver }}-
             ${{ runner.os }}-stack-
 
       - name: Install Stack
