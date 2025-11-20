@@ -45,6 +45,9 @@ jobs:
       STACK_ROOT: ${{ github.workspace }}/.stack-root
       STACK_RESOLVER: ${{ matrix.resolver }}
       STACK_WORK_DIR: ${{ matrix.workdir }}
+      FOURMOLU_VERSION: 0.15.0.0
+      HLINT_VERSION: 3.9.6
+      TOOLS_CACHE_DIR: ${{ runner.temp }}/xts-socket-tools
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -64,29 +67,148 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-stack-
 
+      - name: Cache formatter/linter downloads
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.TOOLS_CACHE_DIR }}
+          key: ${{ runner.os }}-tools-${{ env.FOURMOLU_VERSION }}-${{ env.HLINT_VERSION }}
+
       - name: Install Stack
         uses: haskell-actions/setup@v2
         with:
           enable-stack: true
           stack-version: 'latest'
 
-      - name: Build Fourmolu and HLint
+      - name: Prepare Fourmolu and HLint binaries
         shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          stack --resolver "${STACK_RESOLVER}" --work-dir "${STACK_WORK_DIR}" build fourmolu hlint
+          mkdir -p "${TOOLS_CACHE_DIR}"
+
+          exe_suffix=""
+          declare -a fourmolu_patterns=()
+          declare -a hlint_patterns=()
+
+          case "${RUNNER_OS}" in
+            Linux)
+              fourmolu_patterns=("*linux-x86_64*" "*linux-amd64*" "*linux*")
+              hlint_patterns=("*linux-x86_64*" "*linux-amd64*" "*linux*")
+              ;;
+            macOS)
+              fourmolu_patterns=("*macos-arm64*" "*macos-aarch64*" "*macos-x86_64*" "*macos*")
+              hlint_patterns=("*macos-arm64*" "*darwin-arm64*" "*macos-x86_64*" "*darwin-x86_64*" "*macos*" "*darwin*")
+              ;;
+            Windows)
+              exe_suffix=".exe"
+              fourmolu_patterns=("*windows-x86_64*" "*windows-amd64*" "*windows*")
+              hlint_patterns=("*windows-x86_64*" "*windows-amd64*" "*windows*")
+              ;;
+            *)
+              echo "Unsupported runner OS: ${RUNNER_OS}" >&2
+              exit 1
+              ;;
+          esac
+
+          install_tool () {
+            local repo=$1
+            local tag=$2
+            local tool_name=$3
+            local version=$4
+            local patterns_var=$5
+            local dest_root="${TOOLS_CACHE_DIR}/${tool_name}/${version}/${RUNNER_OS}"
+            local dest_bin="${dest_root}/${tool_name}${exe_suffix}"
+
+            if [ -x "${dest_bin}" ]; then
+              echo "${tool_name} already available at ${dest_bin}"
+              echo "${tool_name^^}_BIN=${dest_bin}" >> "${GITHUB_ENV}"
+              return
+            fi
+
+            mkdir -p "${dest_root}"
+            local work_dir="${dest_root}/work"
+            local success=0
+
+            local patterns_ref_cmd="echo \"\${#${patterns_var}[@]}\""
+            local patterns_count
+            patterns_count=$(eval "${patterns_ref_cmd}")
+            if [ "${patterns_count}" -eq 0 ]; then
+              echo "No download patterns provided for ${tool_name}" >&2
+              exit 1
+            fi
+
+            local patterns_list=()
+            eval "patterns_list=(\"\${${patterns_var}[@]}\")"
+
+            for pattern in "${patterns_list[@]}"; do
+              rm -rf "${work_dir}"
+              mkdir -p "${work_dir}/downloads" "${work_dir}/extracted"
+
+              echo "Downloading ${tool_name} ${version} with pattern ${pattern}"
+              if gh release download "${tag}" --repo "${repo}" --pattern "${pattern}" --dir "${work_dir}/downloads" --clobber; then
+                success=1
+                break
+              else
+                echo "Pattern ${pattern} not available, trying next option..." >&2
+              fi
+            done
+
+            if [ "${success}" -ne 1 ]; then
+              echo "Failed to download ${tool_name} ${version} for ${RUNNER_OS}" >&2
+              exit 1
+            fi
+
+            archive=$(find "${work_dir}/downloads" -maxdepth 1 -type f | head -n1)
+            if [ -z "${archive}" ]; then
+              echo "Failed to locate ${tool_name} archive" >&2
+              exit 1
+            fi
+
+            case "${archive}" in
+              *.tar.gz|*.tgz)
+                tar -xzf "${archive}" -C "${work_dir}/extracted"
+                ;;
+              *.tar.xz)
+                tar -xJf "${archive}" -C "${work_dir}/extracted"
+                ;;
+              *.zip)
+                unzip -q "${archive}" -d "${work_dir}/extracted"
+                ;;
+              *)
+                echo "Unknown archive format: ${archive}" >&2
+                exit 1
+                ;;
+            esac
+
+            binary=$(find "${work_dir}/extracted" -type f \( -name "${tool_name}" -o -name "${tool_name}.exe" \) | head -n1)
+            if [ -z "${binary}" ]; then
+              echo "Unable to locate ${tool_name} binary after extraction" >&2
+              exit 1
+            fi
+
+            mkdir -p "$(dirname "${dest_bin}")"
+            cp "${binary}" "${dest_bin}"
+            chmod +x "${dest_bin}" 2>/dev/null || true
+            rm -rf "${work_dir}"
+
+            echo "${tool_name^^}_BIN=${dest_bin}" >> "${GITHUB_ENV}"
+          }
+
+          install_tool "fourmolu/fourmolu" "v${FOURMOLU_VERSION}" "fourmolu" "${FOURMOLU_VERSION}" fourmolu_patterns
+          install_tool "ndmitchell/hlint" "v${HLINT_VERSION}" "hlint" "${HLINT_VERSION}" hlint_patterns
 
       - name: Run Fourmolu (mode=check)
         shell: bash
         run: |
           set -euo pipefail
-          stack --resolver "${STACK_RESOLVER}" --work-dir "${STACK_WORK_DIR}" exec fourmolu -- --mode check .
+          "${FOURMOLU_BIN}" --mode check --config "${GITHUB_WORKSPACE}/fourmolu.yaml" "${GITHUB_WORKSPACE}"
 
       - name: Run HLint
         shell: bash
         run: |
           set -euo pipefail
-          stack --resolver "${STACK_RESOLVER}" --work-dir "${STACK_WORK_DIR}" exec hlint -- .
+          "${HLINT_BIN}" "${GITHUB_WORKSPACE}"
 
       - name: Run stack test
         shell: bash
