@@ -70,6 +70,24 @@ jobs:
           enable-stack: true
           stack-version: 'latest'
 
+      - name: Build Fourmolu and HLint
+        shell: bash
+        run: |
+          set -euo pipefail
+          stack --resolver "${STACK_RESOLVER}" --work-dir "${STACK_WORK_DIR}" build fourmolu hlint
+
+      - name: Run Fourmolu (mode=check)
+        shell: bash
+        run: |
+          set -euo pipefail
+          stack --resolver "${STACK_RESOLVER}" --work-dir "${STACK_WORK_DIR}" exec fourmolu -- --mode check .
+
+      - name: Run HLint
+        shell: bash
+        run: |
+          set -euo pipefail
+          stack --resolver "${STACK_RESOLVER}" --work-dir "${STACK_WORK_DIR}" exec hlint -- .
+
       - name: Run stack test
         shell: bash
         run: |
