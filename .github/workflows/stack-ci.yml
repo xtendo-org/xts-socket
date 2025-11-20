@@ -20,31 +20,39 @@ jobs:
             os: ubuntu-22.04 # Jammy LTS supplies a modern glibc baseline for GNU/Linux builds.
             resolver: lts-23.28
             workdir: .stack-work-lts23
+            enable_ipv6: "1"
           - name: linux-lts24
             os: ubuntu-22.04 # Reuse the glibc-stable runner for the latest LTS 24 resolver.
             resolver: lts-24.20
             workdir: .stack-work-lts24
+            enable_ipv6: "1"
           - name: windows-lts23
             os: windows-2022 # Windows Server 2022 bundles VS 2022 build tools required by GHC.
             resolver: lts-23.28
             workdir: .stack-work-lts23
+            enable_ipv6: "0"
           - name: windows-lts24
             os: windows-2022 # Same runner keeps ABI parity for the latest Stackage LTS.
             resolver: lts-24.20
             workdir: .stack-work-lts24
+            enable_ipv6: "0"
           - name: macos-lts23
             os: macos-14 # macOS 14 runs on Apple Silicon (arm64) covering the aarch64-darwin target.
             resolver: lts-23.28
             workdir: .stack-work-lts23
+            enable_ipv6: "1"
           - name: macos-lts24
             os: macos-14 # Ensure the Apple Silicon job also exercises the newest resolver.
             resolver: lts-24.20
             workdir: .stack-work-lts24
+            enable_ipv6: "1"
     runs-on: ${{ matrix.os }}
     env:
       STACK_ROOT: ${{ github.workspace }}/.stack-root
       STACK_RESOLVER: ${{ matrix.resolver }}
       STACK_WORK_DIR: ${{ matrix.workdir }}
+      XTS_SOCKET_EXTERNAL: "1"
+      XTS_SOCKET_EXTERNAL_IPV6: ${{ matrix.enable_ipv6 }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -53,8 +61,9 @@ jobs:
           repository: ${{ github.repository }}
           ref: ${{ github.event_name == 'pull_request' && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
 
-      - name: Cache Stack root and work dir
-        uses: actions/cache@v4
+      - name: Restore Stack root and work dir cache
+        id: cache-stack
+        uses: actions/cache/restore@v4
         with:
           path: |
             ${{ github.workspace }}/.stack-root
@@ -76,6 +85,16 @@ jobs:
           set -euo pipefail
           stack --resolver "${STACK_RESOLVER}" --work-dir "${STACK_WORK_DIR}" test --no-terminal
 
+      - name: Save Stack root and work dir cache
+        if: github.ref == 'refs/heads/main' && steps.cache-stack.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ${{ github.workspace }}/.stack-root
+            ${{ matrix.workdir }}
+            ~/.ghcup
+          key: ${{ runner.os }}-stack-${{ matrix.resolver }}
+
   format-lint:
     name: format-lint
     runs-on: ubuntu-22.04
@@ -89,8 +108,9 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Cache formatter/linter downloads
-        uses: actions/cache@v4
+      - name: Restore formatter/linter downloads cache
+        id: cache-tools
+        uses: actions/cache/restore@v4
         with:
           path: ${{ env.TOOLS_CACHE_DIR }}
           key: tools-fourmolu-${{ env.FOURMOLU_VERSION }}-hlint-${{ env.HLINT_VERSION }}
@@ -108,3 +128,10 @@ jobs:
         run: |
           set -euo pipefail
           "${FOURMOLU_BIN}" --mode check --config "${GITHUB_WORKSPACE}/fourmolu.yaml" "${GITHUB_WORKSPACE}"
+
+      - name: Save formatter/linter downloads cache
+        if: github.ref == 'refs/heads/main' && steps.cache-tools.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ env.TOOLS_CACHE_DIR }}
+          key: tools-fourmolu-${{ env.FOURMOLU_VERSION }}-hlint-${{ env.HLINT_VERSION }}

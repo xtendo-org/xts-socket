@@ -70,6 +70,8 @@ test-suite default
     test
   main-is:
     test.hs
+  ghc-options:
+    -Wall
   build-depends:
       base >= 4.7 && < 5
     , QuickCheck >= 2.9
@@ -90,6 +92,7 @@ test-suite threaded
   main-is:
     test.hs
   ghc-options:
+    -Wall
     -threaded
   build-depends:
       base >= 4.7 && < 5
@@ -99,6 +102,25 @@ test-suite threaded
     , tasty
     , tasty-hunit
     , tasty-quickcheck
+    , xts-socket
+
+test-suite external
+  default-language:
+    Haskell2010
+  type:
+    exitcode-stdio-1.0
+  hs-source-dirs:
+    test
+  main-is:
+    external.hs
+  ghc-options:
+    -Wall
+    -threaded
+  build-depends:
+      base >= 4.7 && < 5
+    , bytestring
+    , tasty
+    , tasty-hunit
     , xts-socket
 
 source-repository head
