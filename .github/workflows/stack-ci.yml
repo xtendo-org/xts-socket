@@ -21,31 +21,37 @@ jobs:
             resolver: lts-23.28
             workdir: .stack-work-lts23
             enable_ipv6: "1"
+            cache_programs: "0"
           - name: linux-lts24
             os: ubuntu-22.04 # Reuse the glibc-stable runner for the latest LTS 24 resolver.
             resolver: lts-24.20
             workdir: .stack-work-lts24
             enable_ipv6: "1"
+            cache_programs: "0"
           - name: windows-lts23
             os: windows-2022 # Windows Server 2022 bundles VS 2022 build tools required by GHC.
             resolver: lts-23.28
             workdir: .stack-work-lts23
             enable_ipv6: "0"
+            cache_programs: "1"
           - name: windows-lts24
             os: windows-2022 # Same runner keeps ABI parity for the latest Stackage LTS.
             resolver: lts-24.20
             workdir: .stack-work-lts24
             enable_ipv6: "0"
+            cache_programs: "1"
           - name: macos-lts23
             os: macos-14 # macOS 14 runs on Apple Silicon (arm64) covering the aarch64-darwin target.
             resolver: lts-23.28
             workdir: .stack-work-lts23
             enable_ipv6: "1"
+            cache_programs: "0"
           - name: macos-lts24
             os: macos-14 # Ensure the Apple Silicon job also exercises the newest resolver.
             resolver: lts-24.20
             workdir: .stack-work-lts24
             enable_ipv6: "1"
+            cache_programs: "0"
     runs-on: ${{ matrix.os }}
     env:
       STACK_ROOT: ${{ github.workspace }}/.stack-root
@@ -61,6 +67,10 @@ jobs:
           repository: ${{ github.repository }}
           ref: ${{ github.event_name == 'pull_request' && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
 
+      - name: Record cache date
+        shell: bash
+        run: echo "CACHE_DATE=$(date -u +%Y-%m-%d)" >>"$GITHUB_ENV"
+
       - name: Restore Stack root and work dir cache
         id: cache-stack
         uses: actions/cache/restore@v4
@@ -69,9 +79,9 @@ jobs:
             ${{ github.workspace }}/.stack-root
             ${{ matrix.workdir }}
             ~/.ghcup
-            ${{ env.STACK_PROGRAMS_DIR }}
-          key: ${{ runner.os }}-stack-${{ matrix.resolver }}
+          key: ${{ runner.os }}-stack-${{ matrix.resolver }}-${{ env.CACHE_DATE }}
           restore-keys: |
+            ${{ runner.os }}-stack-${{ matrix.resolver }}-
             ${{ runner.os }}-stack-
 
       - name: Install Stack
@@ -81,6 +91,7 @@ jobs:
           stack-version: 'latest'
 
       - name: Resolve stack programs dir
+        if: matrix.cache_programs == '1'
         id: stack-programs
         shell: bash
         run: |
@@ -93,13 +104,14 @@ jobs:
           fi
 
       - name: Restore Stack programs cache
-        if: env.STACK_PROGRAMS_DIR != ''
+        if: matrix.cache_programs == '1' && env.STACK_PROGRAMS_DIR != ''
         id: cache-programs
         uses: actions/cache/restore@v4
         with:
           path: ${{ env.STACK_PROGRAMS_DIR }}
-          key: ${{ runner.os }}-stack-programs-${{ matrix.resolver }}
+          key: ${{ runner.os }}-stack-programs-${{ matrix.resolver }}-${{ env.CACHE_DATE }}
           restore-keys: |
+            ${{ runner.os }}-stack-programs-${{ matrix.resolver }}-
             ${{ runner.os }}-stack-programs-
 
       - name: Run stack test
@@ -116,15 +128,14 @@ jobs:
             ${{ github.workspace }}/.stack-root
             ${{ matrix.workdir }}
             ~/.ghcup
-            ${{ env.STACK_PROGRAMS_DIR }}
-          key: ${{ runner.os }}-stack-${{ matrix.resolver }}
+          key: ${{ runner.os }}-stack-${{ matrix.resolver }}-${{ env.CACHE_DATE }}
 
       - name: Save Stack programs cache
-        if: github.ref == 'refs/heads/main' && env.STACK_PROGRAMS_DIR != '' && steps.cache-programs.outputs.cache-hit != 'true'
+        if: github.ref == 'refs/heads/main' && matrix.cache_programs == '1' && env.STACK_PROGRAMS_DIR != '' && steps.cache-programs.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
           path: ${{ env.STACK_PROGRAMS_DIR }}
-          key: ${{ runner.os }}-stack-programs-${{ matrix.resolver }}
+          key: ${{ runner.os }}-stack-programs-${{ matrix.resolver }}-${{ env.CACHE_DATE }}
 
   format-lint:
     name: format-lint
