@@ -59,9 +59,9 @@ jobs:
           path: |
             ${{ github.workspace }}/.stack-root
             ${{ matrix.workdir }}
-          key: ${{ runner.os }}-stack-${{ matrix.resolver }}-${{ hashFiles('stack.yaml.lock') }}-${{ matrix.workdir }}
+            ~/.ghcup
+          key: ${{ runner.os }}-stack-${{ matrix.resolver }}
           restore-keys: |
-            ${{ runner.os }}-stack-${{ matrix.resolver }}-
             ${{ runner.os }}-stack-
 
       - name: Install Stack
@@ -75,3 +75,36 @@ jobs:
         run: |
           set -euo pipefail
           stack --resolver "${STACK_RESOLVER}" --work-dir "${STACK_WORK_DIR}" test --no-terminal
+
+  format-lint:
+    name: format-lint
+    runs-on: ubuntu-22.04
+    env:
+      FOURMOLU_VERSION: 0.19.0.1
+      HLINT_VERSION: 3.10
+      TOOLS_CACHE_DIR: ${{ github.workspace }}/.ci-tools
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Cache formatter/linter downloads
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.TOOLS_CACHE_DIR }}
+          key: tools-fourmolu-${{ env.FOURMOLU_VERSION }}-hlint-${{ env.HLINT_VERSION }}
+
+      - name: Prepare Fourmolu and HLint binaries
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          bash .github/scripts/install-tools.sh
+
+      - name: Run Fourmolu (mode=check)
+        shell: bash
+        run: |
+          set -euo pipefail
+          "${FOURMOLU_BIN}" --mode check --config "${GITHUB_WORKSPACE}/fourmolu.yaml" "${GITHUB_WORKSPACE}"

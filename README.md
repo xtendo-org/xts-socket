@@ -4,13 +4,19 @@ xts-socket is a Haskell library that provides API to the POSIX BSD-style sockets
 
 **WARNING: This is a work in progress. Things will not work yet. Do not use this now.**
 
-Motivation: `socket` should be a good lightweight alternative to the [`network`](https://hackage.haskell.org/package/network). However, it seems the maintainer has left. The project's last commit was in June 2020. As of writing, that was more than five years ago. Pull requests and issues are left unanswered.
+Motivation: `socket` should be a good lightweight alternative to the [`network`](https://hackage.haskell.org/package/network) library. However, it seems the maintainer has left. The project's last commit was in June 2020. As of writing, that was more than five years ago. Pull requests and issues are left unanswered.
 
 The current goal is to configure GitHub Actions to run the tests in these environments:
 
 - GNU/Linux
 - Windows
 - macOS (aarch64-darwin)
+
+Then I will address some needs:
+
+- More test cases (especially testing connection to known, public addresses)
+- CI to test Fourmolu for formatting, HLint for linting
+- Safe way to feed a "number" (`Word16`) as a "port" (There is currently no public API for this, except going through `Int`)
 
 ## Principles
 
@@ -20,13 +26,12 @@ We will try to follow the original implementation principle:
 - Absolutely no conditional exports.
 - No `#ifdef` madness in the Haskell sources. The Haskell binding code uses the FFI to reference platform dependent C functions for each operation. If a platform is not POSIX compliant (i.e. Windows) equivalent functionality is implemented by using whatever the platform specific building blocks are.
 
-In general, we will respect the original. One important difference is that we use Stack and Hpack for package organization and management.
+In addition to the above:
 
-Other principles:
+- Keep minimal dependencies. (Currently just two: `base` and `bytestring`) The goal is to make a package that serve as a building block for other packages. Adding more dependency is not an option.
+- Keep `{-# LANGUAGE CPP #-}` (The C pre-processor language extension) as little as possible, and restrict them to minimal modules; Development tools (Fourmolu, HLint, and even HLS) are known to have difficulties working with them.
 
-- `base` and `bytestring` are the only acceptable dependencies. The goal is to make a package that serve as a building block for other packages. Adding more dependency is not an option.
-
-Below is some excerpts from the original `README.md`:
+Below are some excerpts from the original `README.md`:
 
 # socket
 
