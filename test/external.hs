@@ -13,11 +13,11 @@ import Data.ByteString.Builder (Builder)
 import qualified Data.ByteString.Builder as B
 import qualified Data.ByteString.Lazy as LB
 import Data.Char (toLower)
+import Data.Int
 import Data.Maybe (isJust, listToMaybe)
-import Data.Word (Word16)
+import Data.Word
 import System.Environment (lookupEnv)
 import System.Exit (exitSuccess)
-import System.IO.Error (IOError)
 import System.Socket
 import System.Socket.Family.Inet
 import System.Socket.Family.Inet6
@@ -142,6 +142,7 @@ validateDnsResponse bs = do
   when (an == 0) $
     assertFailure "DNS answer contained no records"
  where
+  decode16 :: ByteString -> Int -> Word16
   decode16 bytes offset = (fromIntegral hi `shiftL` 8) .|. fromIntegral lo
    where
     hi = B.index bytes offset
@@ -174,7 +175,7 @@ ipv6Tests True =
 withNetworkRetries :: IO a -> IO a
 withNetworkRetries action = go maxAttempts initialDelay
  where
-  maxAttempts = 4
+  maxAttempts = 4 :: Int32
   initialDelay = 500_000
   go attemptsLeft delayMicros = do
     outcome <- try action
