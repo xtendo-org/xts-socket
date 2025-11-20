@@ -1,7 +1,3 @@
---------------------------------------------------------------------------------
-
---------------------------------------------------------------------------------
-
 -- |
 -- Module      :  System.Socket.Protocol.TCP
 -- Copyright   :  (c) Lars Petersen 2015
@@ -24,7 +20,7 @@ instance Protocol TCP where
 -- | If set to True, disable the Nagle's algorithm.
 --
 --  - Also know as @TCP_NODELAY@.
-data NoDelay
+newtype NoDelay
   = NoDelay Bool
   deriving (Eq, Ord, Show)
 

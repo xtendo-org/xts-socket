@@ -171,6 +171,12 @@ jobs:
           set -euo pipefail
           "${FOURMOLU_BIN}" --mode check --config "${GITHUB_WORKSPACE}/fourmolu.yaml" "${GITHUB_WORKSPACE}"
 
+      - name: Run HLint
+        shell: bash
+        run: |
+          set -euo pipefail
+          "${HLINT_BIN}" --hint="${GITHUB_WORKSPACE}/.hlint.yaml" "${GITHUB_WORKSPACE}"
+
       - name: Save formatter/linter downloads cache
         if: github.ref == 'refs/heads/main' && steps.cache-tools.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4

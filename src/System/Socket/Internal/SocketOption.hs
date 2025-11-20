@@ -54,7 +54,7 @@ class SocketOption o where
 --   - Also known as @SO_ERROR@.
 --   - The operation `setSocketOption` always throws `eInvalid` for  this option.
 --   - Use with care in the presence of concurrency!
-data Error
+newtype Error
   = Error SocketException
   deriving (Eq, Ord, Show)
 
@@ -68,7 +68,7 @@ instance SocketOption Error where
 --
 --  - Also known as @SO_REUSEADDR@.
 --  - This is particularly useful when experiencing `eAddressInUse` exceptions.
-data ReuseAddress
+newtype ReuseAddress
   = ReuseAddress Bool
   deriving (Eq, Ord, Show)
 
@@ -87,7 +87,7 @@ instance SocketOption ReuseAddress where
 --   if the other end is still alive.
 --
 --  - Also known as @SO_KEEPALIVE@.
-data KeepAlive
+newtype KeepAlive
   = KeepAlive Bool
   deriving (Eq, Ord, Show)
 

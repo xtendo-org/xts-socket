@@ -220,7 +220,7 @@ socket :: (Family f, Type t, Protocol p) => IO (Socket f t p)
 socket = socket'
  where
   socket' :: forall f t p. (Family f, Type t, Protocol p) => IO (Socket f t p)
-  socket' = alloca $ \errPtr -> do
+  socket' = alloca $ \errPtr ->
     bracketOnError
       -- Try to acquire the socket resource. This part has exceptions masked.
       ( c_socket
@@ -335,7 +335,7 @@ accept :: (Family f) => Socket f t p -> IO (Socket f t p, SocketAddress f)
 accept s@(Socket mfd) = accept'
  where
   accept' :: forall f t p. (Family f) => IO (Socket f t p, SocketAddress f)
-  accept' = do
+  accept' =
     -- Allocate local (!) memory for the address.
     alloca $ \addrPtr -> alloca $ \addrPtrLen -> alloca $ \errPtr -> do
       poke addrPtrLen (fromIntegral $ sizeOf (undefined :: SocketAddress f))
@@ -434,15 +434,14 @@ receiveFrom = receiveFrom'
     :: forall f t p
      . (Family f)
     => Socket f t p -> Int -> MessageFlags -> IO (BS.ByteString, SocketAddress f)
-  receiveFrom' s bufSize flags = do
-    alloca $ \addrPtr -> do
-      alloca $ \addrSizePtr -> do
-        poke addrSizePtr (fromIntegral $ sizeOf (undefined :: SocketAddress f))
-        bs <- BS.createUptoN bufSize $ \bufPtr ->
-          fromIntegral
-            `fmap` unsafeReceiveFrom s bufPtr (fromIntegral bufSize) flags addrPtr addrSizePtr
-        addr <- peek addrPtr
-        return (bs, addr)
+  receiveFrom' s bufSize flags =
+    alloca $ \addrPtr -> alloca $ \addrSizePtr -> do
+      poke addrSizePtr (fromIntegral $ sizeOf (undefined :: SocketAddress f))
+      bs <- BS.createUptoN bufSize $ \bufPtr ->
+        fromIntegral
+          `fmap` unsafeReceiveFrom s bufPtr (fromIntegral bufSize) flags addrPtr addrSizePtr
+      addr <- peek addrPtr
+      return (bs, addr)
 
 -- | Closes a socket.
 --
@@ -458,31 +457,29 @@ receiveFrom = receiveFrom'
 --   - This operation potentially throws `SocketException`s (only @EIO@ is
 --     documented). `eInterrupted` is catched internally and retried automatically, so won't be thrown.
 close :: Socket f t p -> IO ()
-close (Socket mfd) = do
-  modifyMVarMasked_ mfd $ \fd -> do
-    if fd < 0
-      then do
-        return fd
-      else do
-        -- closeFdWith does not throw even on invalid file descriptors.
-        -- It just assures no thread is blocking on the fd anymore and then executes the IO action.
-        closeFdWith
-          -- The c_close operation may (according to Posix documentation) fails with EINTR or EBADF or EIO.
-          -- EBADF: Should be ruled out by the library's design.
-          -- EINTR: It is best practice to just retry the operation what we do here.
-          -- EIO: Only occurs when filesystem is involved (?).
-          -- Conclusion: Our close should never fail. If it does, something is horribly wrong.
-          ( const $ alloca $ \errPtr -> fix $ \retry -> do
-              i <- c_close fd errPtr
-              when (i /= 0) $ do
-                err <- SocketException <$> peek errPtr
-                when (err /= eInterrupted) (throwIO err)
-                retry
-          )
-          fd
-        -- When we arrive here, no exception has been thrown and the descriptor has been closed.
-        -- We put an invalid file descriptor into the MVar.
-        return (-1)
+close (Socket mfd) = modifyMVarMasked_ mfd $ \fd ->
+  if fd < 0
+    then return fd
+    else do
+      -- closeFdWith does not throw even on invalid file descriptors.
+      -- It just assures no thread is blocking on the fd anymore and then executes the IO action.
+      closeFdWith
+        -- The c_close operation may (according to Posix documentation) fails with EINTR or EBADF or EIO.
+        -- EBADF: Should be ruled out by the library's design.
+        -- EINTR: It is best practice to just retry the operation what we do here.
+        -- EIO: Only occurs when filesystem is involved (?).
+        -- Conclusion: Our close should never fail. If it does, something is horribly wrong.
+        ( const $ alloca $ \errPtr -> fix $ \retry -> do
+            i <- c_close fd errPtr
+            when (i /= 0) $ do
+              err <- SocketException <$> peek errPtr
+              when (err /= eInterrupted) (throwIO err)
+              retry
+        )
+        fd
+      -- When we arrive here, no exception has been thrown and the descriptor has been closed.
+      -- We put an invalid file descriptor into the MVar.
+      return (-1)
 
 -- | Get a socket's (local) address.
 --
