@@ -172,8 +172,8 @@ import qualified Data.ByteString as BS
 import qualified Data.ByteString.Internal as BS
 import qualified Data.ByteString.Unsafe as BS
 import Data.Function
-import Foreign.Storable
 import Foreign.Marshal.Alloc
+import Foreign.Storable
 import GHC.Conc (closeFdWith)
 import System.Socket.Internal.AddressInfo
 import System.Socket.Internal.Exception
