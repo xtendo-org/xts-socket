@@ -69,6 +69,7 @@ jobs:
             ${{ github.workspace }}/.stack-root
             ${{ matrix.workdir }}
             ~/.ghcup
+            ${{ env.STACK_PROGRAMS_DIR }}
           key: ${{ runner.os }}-stack-${{ matrix.resolver }}
           restore-keys: |
             ${{ runner.os }}-stack-
@@ -78,6 +79,28 @@ jobs:
         with:
           enable-stack: true
           stack-version: 'latest'
+
+      - name: Resolve stack programs dir
+        id: stack-programs
+        shell: bash
+        run: |
+          set -euo pipefail
+          dir="$(stack path --programs 2>/dev/null || true)"
+          if [ -z "$dir" ]; then
+            echo "STACK_PROGRAMS_DIR=" >>"$GITHUB_ENV"
+          else
+            echo "STACK_PROGRAMS_DIR=$dir" >>"$GITHUB_ENV"
+          fi
+
+      - name: Restore Stack programs cache
+        if: env.STACK_PROGRAMS_DIR != ''
+        id: cache-programs
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ env.STACK_PROGRAMS_DIR }}
+          key: ${{ runner.os }}-stack-programs-${{ matrix.resolver }}
+          restore-keys: |
+            ${{ runner.os }}-stack-programs-
 
       - name: Run stack test
         shell: bash
@@ -93,7 +116,15 @@ jobs:
             ${{ github.workspace }}/.stack-root
             ${{ matrix.workdir }}
             ~/.ghcup
+            ${{ env.STACK_PROGRAMS_DIR }}
           key: ${{ runner.os }}-stack-${{ matrix.resolver }}
+
+      - name: Save Stack programs cache
+        if: github.ref == 'refs/heads/main' && env.STACK_PROGRAMS_DIR != '' && steps.cache-programs.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ env.STACK_PROGRAMS_DIR }}
+          key: ${{ runner.os }}-stack-programs-${{ matrix.resolver }}
 
   format-lint:
     name: format-lint
