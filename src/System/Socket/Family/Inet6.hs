@@ -255,7 +255,7 @@ instance Storable (SocketAddress Inet6) where
 -------------------------------------------------------------------------------
 
 -- | @IPV6_V6ONLY@
-data V6Only
+newtype V6Only
   = V6Only Bool
   deriving (Eq, Ord, Show)
 

@@ -269,7 +269,7 @@ getAddressInfo'
   -> Maybe BS.ByteString
   -> AddressInfoFlags
   -> IO [AddressInfo f t p]
-getAddressInfo' mnode mservice (AddressInfoFlags flags) = do
+getAddressInfo' mnode mservice (AddressInfoFlags flags) =
   alloca $ \resultPtrPtr -> do
     poke resultPtrPtr nullPtr
     allocaBytes sizeofAddrInfo $ \addrInfoPtr -> do
@@ -279,7 +279,7 @@ getAddressInfo' mnode mservice (AddressInfoFlags flags) = do
       poke (ai_family addrInfoPtr) (familyNumber (undefined :: f))
       poke (ai_socktype addrInfoPtr) (typeNumber (undefined :: t))
       poke (ai_protocol addrInfoPtr) (protocolNumber (undefined :: p))
-      fnode $ \nodePtr -> do
+      fnode $ \nodePtr ->
         fservice $ \servicePtr ->
           bracket
             (c_getaddrinfo nodePtr servicePtr addrInfoPtr resultPtrPtr)
@@ -292,8 +292,7 @@ getAddressInfo' mnode mservice (AddressInfoFlags flags) = do
                   then do
                     resultPtr <- peek resultPtrPtr
                     peekAddressInfos resultPtr
-                  else do
-                    throwIO (AddressInfoException e)
+                  else throwIO (AddressInfoException e)
             )
  where
   ai_flags = (`plusPtr` addrinfoFlagsOffset) . castPtr
@@ -367,8 +366,7 @@ getNameInfo' addr (NameInfoFlags flags) =
             host <- BS.packCString hostPtr
             serv <- BS.packCString servPtr
             return $ NameInfo host serv
-          else do
-            throwIO (AddressInfoException e)
+          else throwIO (AddressInfoException e)
 
 sizeofAddrInfo :: Int
 sizeofAddrInfo = fromIntegral c_sizeof_addrinfo

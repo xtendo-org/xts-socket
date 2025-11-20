@@ -88,8 +88,7 @@ sendAllLazy s lbs flags =
 --   way to determine a `BB.Builder`s size without actually building it.
 sendAllBuilder
   :: Socket f Stream p -> Int -> BB.Builder -> MessageFlags -> IO Int64
-sendAllBuilder s bufsize builder flags = do
-  allocaBytes bufsize g
+sendAllBuilder s bufsize builder flags = allocaBytes bufsize g
  where
   g ptr = writeStep (BB.runPut $ BB.putBuilder builder) 0
    where
@@ -146,15 +145,12 @@ receiveAllLazy
 receiveAllLazy sock maxLen flags = collect 0 Data.Monoid.mempty
  where
   collect len accum
-    | len > maxLen = do
-        build accum
+    | len > maxLen = build accum
     | otherwise = do
         bs <- receive sock BB.smallChunkSize flags
         if BS.null bs
-          then do
-            build accum
-          else do
+          then build accum
+          else
             collect (len + fromIntegral (BS.length bs)) $!
               (accum `Data.Monoid.mappend` BB.byteString bs)
-  build accum = do
-    return (BB.toLazyByteString accum)
+  build accum = return (BB.toLazyByteString accum)
