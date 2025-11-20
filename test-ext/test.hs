@@ -4,7 +4,7 @@
 module Main (main) where
 
 import Control.Concurrent (threadDelay)
-import Control.Exception (SomeException, bracket, fromException, throwIO, try)
+import Control.Exception
 import Control.Monad (unless, void, when)
 import Data.Bits (shiftL, (.&.), (.|.))
 import Data.ByteString (ByteString)
@@ -26,6 +26,7 @@ import System.Socket.Protocol.UDP
 import System.Socket.Type.Datagram
 import System.Socket.Type.Stream
 import Test.Tasty
+import Test.Tasty.ExpectedFailure (ignoreTestBecause)
 import Test.Tasty.HUnit
 
 main :: IO ()
@@ -44,11 +45,19 @@ main = do
     maybe False $ \raw -> map toLower raw `elem` ["1", "true", "yes", "on"]
   runTest = do
     ipv6EnvVar <- lookupEnv ipv6EnvVarName
+    ipv6Part <-
+      if envEnabled ipv6EnvVar
+        then do
+          ipv6Available <- detectIpv6Connectivity
+          return
+            [ if ipv6Available
+                then ipv6Test
+                else ignoreTestBecause "No IPv6 connectivity" ipv6Test
+            ]
+        else return []
     defaultMain $
       localOption (mkTimeout defaultTimeoutMicros) $
-        testGroup
-          "external"
-          ([tcpGithubHead, udpGoogleDns] <> ipv6Tests (envEnabled ipv6EnvVar))
+        testGroup "external" ([tcpGithubHead, udpGoogleDns] <> ipv6Part)
 
 -- Constants
 
@@ -66,6 +75,11 @@ exampleQuery =
       , encodeLabels ["example", "com"]
       , "\x00\x01\x00\x01"
       ]
+ where
+  encodeLabels parts = mconcat (map encode parts) <> B.word8 0
+   where
+    encode segment =
+      B.word8 (fromIntegral $ B.length segment) <> B.byteString segment
 
 defaultTimeoutMicros :: Integer
 defaultTimeoutMicros = 30 * 1_000_000
@@ -76,6 +90,14 @@ githubHeadRequest =
   \Host: github.com\r\n\
   \User-Agent: xts-socket-tests/1\r\n\
   \Connection: close\r\n\r\n"
+
+dnsUdpPort :: Word16
+dnsUdpPort = 53
+
+ipv6Target :: SocketAddress Inet6
+ipv6Target = SocketAddressInet6 addr (fromIntegral dnsUdpPort) 0 0
+ where
+  addr = inet6AddressFromTuple (0x2606, 0x4700, 0x4700, 0, 0, 0, 0, 0x1111)
 
 -- Test cases
 
@@ -107,21 +129,69 @@ tcpGithubHead = testCase tcName $ withNetworkRetries $ do
   tcName = "github.com:80 responds to HTTP HEAD"
 
 udpGoogleDns :: TestTree
-udpGoogleDns =
-  testCase "8.8.4.4 answers DNS queries in UDP" $
-    withNetworkRetries $
-      bracket (socket :: IO (Socket Inet Datagram UDP)) close $ \sock -> do
-        void $ sendTo sock exampleQuery mempty target
-        (response, _) <- receiveFrom sock 512 mempty
-        validateDnsResponse response
+udpGoogleDns = testCase
+  "8.8.4.4 answers DNS queries in UDP"
+  $ withNetworkRetries
+  $ bracket (socket :: IO (Socket Inet Datagram UDP)) close
+  $ \sock -> do
+    void $ sendTo sock exampleQuery mempty target
+    (response, _) <- receiveFrom sock 512 mempty
+    validateDnsResponse response
  where
-  target = SocketAddressInet (inetAddressFromTuple (8, 8, 4, 4)) 53
+  target = SocketAddressInet addr port
+  addr = inetAddressFromTuple (8, 8, 4, 4)
+  port = fromIntegral dnsUdpPort
 
-encodeLabels :: [ByteString] -> Builder
-encodeLabels parts = mconcat (map encode parts) <> B.word8 0
+ipv6Test :: TestTree
+ipv6Test = testCase
+  "2606:4700:4700::1111 answers DNS queries"
+  $ withNetworkRetries
+  $ bracket (socket :: IO (Socket Inet6 Datagram UDP)) close
+  $ \sock -> do
+    void $ sendTo sock exampleQuery mempty ipv6Target
+    (response, _) <- receiveFrom sock 512 mempty
+    validateDnsResponse response
+
+-- Utilities
+
+detectIpv6Connectivity :: IO Bool
+detectIpv6Connectivity =
+  (probe >> return True) `catch` handler
  where
-  encode segment =
-    B.word8 (fromIntegral $ B.length segment) <> B.byteString segment
+  probe = bracket acquire close $ \sock -> connect sock ipv6Target
+  acquire = socket :: IO (Socket Inet6 Datagram UDP)
+  handler e
+    | Just sockErr <- fromException e
+    , sockErr == eHostUnreachable || sockErr == eNetworkUnreachable =
+        return False
+    | otherwise = throwIO e
+
+withNetworkRetries :: IO a -> IO a
+withNetworkRetries action = go maxAttempts initialDelay
+ where
+  maxAttempts = 3 :: Int32
+  initialDelay = 500_000
+  go attemptsLeft delayMicros = do
+    outcome <- try action
+    case outcome of
+      Right result -> return result
+      Left err
+        | shouldRetry err && attemptsLeft > 0 -> do
+            print err
+            putStrLn $ "Retrying " <> show attemptsLeft <> " more times"
+            threadDelay delayMicros
+            go (attemptsLeft - 1) (delayMicros * 2)
+        | otherwise -> throwIO err
+
+shouldRetry :: SomeException -> Bool
+shouldRetry err =
+  isSocketException || isIoException
+ where
+  isSocketException = isJust (fromException err :: Maybe SocketException)
+  isIoException = isJust (fromException err :: Maybe IOError)
+
+build :: Builder -> ByteString
+build = LB.toStrict . B.toLazyByteString
 
 validateDnsResponse :: ByteString -> Assertion
 validateDnsResponse bs = do
@@ -147,54 +217,3 @@ validateDnsResponse bs = do
    where
     hi = B.index bytes offset
     lo = B.index bytes (offset + 1)
-
-ipv6Tests :: Bool -> [TestTree]
-ipv6Tests False = []
-ipv6Tests True =
-  [ testCase "2606:4700:4700::1111 answers DNS queries" $
-      withNetworkRetries $
-        bracket (socket :: IO (Socket Inet6 Datagram UDP)) close $ \sock -> do
-          void $ sendTo sock exampleQuery mempty target
-          (response, _) <- receiveFrom sock 512 mempty
-          validateDnsResponse response
-  ]
- where
-  target =
-    SocketAddressInet6
-      -- Address
-      (inet6AddressFromTuple (0x2606, 0x4700, 0x4700, 0, 0, 0, 0, 0x1111))
-      -- Port
-      53
-      -- FlowInfo
-      0
-      -- ScopeId
-      0
-
--- Utilities
-
-withNetworkRetries :: IO a -> IO a
-withNetworkRetries action = go maxAttempts initialDelay
- where
-  maxAttempts = 4 :: Int32
-  initialDelay = 500_000
-  go attemptsLeft delayMicros = do
-    outcome <- try action
-    case outcome of
-      Right result -> return result
-      Left err
-        | shouldRetry err && attemptsLeft > 1 -> do
-            print err
-            putStrLn $ "Retrying " <> show attemptsLeft <> " more times"
-            threadDelay delayMicros
-            go (attemptsLeft - 1) (delayMicros * 2)
-        | otherwise -> throwIO err
-
-shouldRetry :: SomeException -> Bool
-shouldRetry err =
-  isSocketException || isIoException
- where
-  isSocketException = isJust (fromException err :: Maybe SocketException)
-  isIoException = isJust (fromException err :: Maybe IOError)
-
-build :: Builder -> ByteString
-build = LB.toStrict . B.toLazyByteString

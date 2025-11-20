@@ -70,8 +70,6 @@ test-suite default
     test
   main-is:
     test.hs
-  ghc-options:
-    -Wall
   build-depends:
       base >= 4.7 && < 5
     , QuickCheck >= 2.9
@@ -92,7 +90,6 @@ test-suite threaded
   main-is:
     test.hs
   ghc-options:
-    -Wall
     -threaded
   build-depends:
       base >= 4.7 && < 5
@@ -110,9 +107,9 @@ test-suite external
   type:
     exitcode-stdio-1.0
   hs-source-dirs:
-    test
+    test-ext
   main-is:
-    external.hs
+    test.hs
   ghc-options:
     -Wall
     -threaded
@@ -120,6 +117,7 @@ test-suite external
       base >= 4.7 && < 5
     , bytestring
     , tasty
+    , tasty-expected-failure
     , tasty-hunit
     , xts-socket
 
