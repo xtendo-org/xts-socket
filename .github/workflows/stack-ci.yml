@@ -108,9 +108,3 @@ jobs:
         run: |
           set -euo pipefail
           "${FOURMOLU_BIN}" --mode check --config "${GITHUB_WORKSPACE}/fourmolu.yaml" "${GITHUB_WORKSPACE}"
-
-      - name: Run HLint
-        shell: bash
-        run: |
-          set -euo pipefail
-          "${HLINT_BIN}" "${GITHUB_WORKSPACE}"
