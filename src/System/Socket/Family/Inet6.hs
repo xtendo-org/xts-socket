@@ -21,7 +21,7 @@ module System.Socket.Family.Inet6 (
   Inet6Address,
 
   -- ** Inet6Port
-  Inet6Port,
+  Inet6Port (..),
 
   -- ** Inet6FlowInfo
   Inet6FlowInfo,
