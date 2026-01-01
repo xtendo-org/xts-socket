@@ -432,7 +432,6 @@ group07 =
                   sent <-
                     sendAllBuilder
                       client
-                      512
                       (foldr (\bs -> (BB.byteString bs `mappend`)) mempty $ LBS.toChunks msg)
                       mempty
                   close client
@@ -441,6 +440,40 @@ group07 =
                     (sent /= LBS.length msg)
                     (assertFailure "sendAllBuilder reported wrong size.")
                   when (msgReceived /= msg) (assertFailure "Received message was bogus.")
+              )
+        , testCase "sendAllBuilderWithBufSize with a large chunk" $
+            bracket
+              ( do
+                  server <- socket :: IO (Socket Inet Stream TCP)
+                  client <- socket :: IO (Socket Inet Stream TCP)
+                  return (server, client)
+              )
+              ( \(server, client) -> do
+                  close server
+                  close client
+              )
+              ( \(server, client) -> do
+                  let addr = SocketAddressInet inetLoopback port
+                  let bigChunk = BS.pack $ take 8192 (cycle [0 .. 255])
+                  let msg = LBS.fromChunks [bigChunk, "tail"]
+                  setSocketOption server (ReuseAddress True)
+                  bind server addr
+                  listen server 5
+                  serverRecv <- async $ do
+                    (peerSock, _) <- accept server
+                    receiveAllLazy peerSock (fromIntegral (LBS.length msg)) mempty
+                  threadDelay 100000
+                  connect client addr
+                  sent <-
+                    sendAllBuilderWithBufSize
+                      client
+                      16
+                      (foldr (\bs -> (BB.byteString bs `mappend`)) mempty $ LBS.toChunks msg)
+                      mempty
+                  close client
+                  msgReceived <- wait serverRecv
+                  assertEqual "total sent bytes reported" sent (LBS.length msg)
+                  assertEqual "payload mismatch" msg msgReceived
               )
         ]
     ]

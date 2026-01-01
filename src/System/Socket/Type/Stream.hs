@@ -23,6 +23,7 @@ module System.Socket.Type.Stream (
 
   -- *** sendAllBuilder
   sendAllBuilder,
+  sendAllBuilderWithBufSize,
 
   -- ** Specialized receive operations
 
@@ -30,17 +31,17 @@ module System.Socket.Type.Stream (
   receiveAllLazy,
 ) where
 
-import Control.Exception (throwIO)
 import Control.Monad (when)
+import Data.Bits
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Builder as BB
-import qualified Data.ByteString.Builder.Internal as BB
+import qualified Data.ByteString.Builder.Extra as BE
 import qualified Data.ByteString.Lazy as LBS
 import qualified Data.ByteString.Unsafe as BS
 import Data.Int
 import Data.Monoid
 import Data.Word
-import Foreign.Marshal.Alloc
+import Foreign.ForeignPtr (ForeignPtr, mallocForeignPtrBytes, withForeignPtr)
 import Foreign.Ptr
 import System.Socket
 import System.Socket.Internal.Constants
@@ -79,56 +80,92 @@ sendAllLazy s lbs flags =
     return $! sent + sent'
 
 -- | Sends a whole `BB.Builder` without allocating `BS.ByteString`s.
---   If performance is an issue, this operation should be preferred over all
---   other solutions for sending stream data.
 --
---   The operation `alloca`tes a single buffer of the given size on entry and
---   reuses this buffer until the whole `BB.Builder` has been sent.
---   The count of all bytes sent is returned as there is no other efficient
---   way to determine a `BB.Builder`s size without actually building it.
+-- Normally, this should be the fastest option for sending data in streaming
+-- communication.
 sendAllBuilder
-  :: Socket f Stream p -> Int -> BB.Builder -> MessageFlags -> IO Int64
-sendAllBuilder s bufsize builder flags = allocaBytes bufsize g
+  :: Socket f Stream p
+  -- ^ Socket to send on
+  -> BB.Builder
+  -- ^ Message to send (the \"payload\")
+  -> MessageFlags
+  -- ^ @send@ message flags (the @flags@ argument of the underlying OS call)
+  -> IO Int64
+  -- ^ Total bytes sent
+sendAllBuilder s builder flags = sendAllBuilderWithBufSize s 4096 builder flags
+
+-- | Like `sendAllBuilder`, but allows configuring the \"initial buffer size\".
+--
+-- Buffer size explanation: When running a `Data.ByteString.Builder.Builder`,
+-- either a reference to an existing strict `Data.ByteString.ByteString` is
+-- returned, or a memory location is requested (the builder needs to write
+-- bytes to it). We allocate a buffer for this, whose size is 4096 bytes by
+-- default.
+--
+-- This buffer is reused repeatedly until the builder finishes running. When
+-- the builder requests more space than the current buffer has, it's replaced
+-- with a new buffer sized to the \"next power of two\" covering the request.
+--
+-- Therefore, if you know your builder will somehow request large contiguous
+-- space, configuring the initial buffer size might reduce the number of
+-- allocations and improve performance.
+--
+-- (Benchmark to see if a larger initial size actually helps; if you call this
+-- frequently, repeatedly allocating\/freeing a larger buffer may in fact hurt
+-- performance.)
+sendAllBuilderWithBufSize
+  :: Socket f Stream p
+  -- ^ Socket to send on.
+  -> Int
+  -- ^ Initial buffer size in bytes. The caller is responsible for preventing a
+  -- wrong value (e.g. a negative number)
+  -> BB.Builder
+  -- ^ Message to send (the \"payload\")
+  -> MessageFlags
+  -- ^ @send@ message flags (the @flags@ argument of the underlying OS call)
+  -> IO Int64
+  -- ^ Total bytes sent
+sendAllBuilderWithBufSize s initialBufferSize builder flags = do
+  let writer0 = BE.runBuilder builder
+  fp0 <- mallocForeignPtrBytes initialBufferSize
+  sendLoop writer0 fp0 initialBufferSize 0
  where
-  g ptr = writeStep (BB.runPut $ BB.putBuilder builder) 0
-   where
-    bufferRange :: BB.BufferRange
-    bufferRange =
-      BB.BufferRange ptr (plusPtr ptr bufsize)
-    writeStep :: BB.BuildStep a -> Int64 -> IO Int64
-    writeStep step alreadySent =
-      BB.fillWithBuildStep step whenDone whenFull whenChunk bufferRange
-     where
-      whenDone ptrToNextFreeByte _
-        | len > 0 = do
-            sendAllPtr ptr len
-            return $! alreadySent + fromIntegral len
-        | otherwise =
-            return alreadySent
-       where
-        len = minusPtr ptrToNextFreeByte ptr
-      whenFull ptrToNextFreeByte minBytesRequired nextStep
-        | minBytesRequired > bufsize =
-            throwIO eNoBufferSpace
-        | otherwise = do
-            sendAllPtr ptr len
-            writeStep nextStep $! alreadySent + fromIntegral len
-       where
-        len = minusPtr ptrToNextFreeByte ptr
-      whenChunk ptrToNextFreeByte bs nextStep = do
-        sendAllPtr ptr len
-        if BS.null bs
-          then
-            writeStep nextStep $! alreadySent + fromIntegral len
-          else do
-            bsLen <- sendAll s bs flags
-            writeStep nextStep $! alreadySent + fromIntegral (len + bsLen)
-       where
-        len = minusPtr ptrToNextFreeByte ptr
+  sendLoop :: BE.BufferWriter -> ForeignPtr Word8 -> Int -> Int64 -> IO Int64
+  sendLoop writer fp bufSize alreadySent = withForeignPtr fp $ \ptr -> do
+    (written, next) <- writer ptr bufSize
+    when (written > 0) $ sendAllPtr ptr written
+    let sentSoFar = alreadySent + fromIntegral written
+    case next of
+      BE.Done -> return sentSoFar
+      BE.Chunk bs writer' -> do
+        bsSent <-
+          if BS.null bs then return 0 else fromIntegral `fmap` sendAll s bs flags
+        sendLoop writer' fp bufSize (sentSoFar + bsSent)
+      BE.More minReq writer' -> do
+        (newFp, newSize) <-
+          if minReq <= bufSize
+            then return (fp, bufSize)
+            else do
+              let newSize = nextPowerOfTwo minReq
+              newFp <- mallocForeignPtrBytes newSize
+              return (newFp, newSize)
+        sendLoop writer' newFp newSize sentSoFar
+
   sendAllPtr :: Ptr Word8 -> Int -> IO ()
   sendAllPtr ptr len = do
     sent <- fromIntegral `fmap` unsafeSend s ptr (fromIntegral len) flags
     when (sent < len) $ sendAllPtr (plusPtr ptr sent) (len - sent)
+
+  nextPowerOfTwo :: Int -> Int
+  nextPowerOfTwo n
+    | n <= 1 = 1
+    | otherwise =
+        let w = fromIntegral (n - 1) :: Word
+            shiftAmount = finiteBitSize w - countLeadingZeros w
+            resWord = (1 :: Word) `shiftL` shiftAmount
+            capInt = bit (finiteBitSize (0 :: Int) - 1) :: Int
+            resInt = fromIntegral resWord :: Int
+         in if resInt <= 0 || resInt > capInt then capInt else resInt
 
 -- | Like `receive`, but operates on lazy `Data.ByteString.Lazy.ByteString`s
 -- and continues until either an empty part has been received (peer closed the
@@ -147,7 +184,7 @@ receiveAllLazy sock maxLen flags = collect 0 Data.Monoid.mempty
   collect len accum
     | len > maxLen = build accum
     | otherwise = do
-        bs <- receive sock BB.smallChunkSize flags
+        bs <- receive sock BE.smallChunkSize flags
         if BS.null bs
           then build accum
           else
